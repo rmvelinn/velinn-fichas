@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: velinn-fichas
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GMAIL_SA_JSON
+        sync: false
+      - key: DRIVE_SA_JSON
+        sync: false
+      - key: EMAIL_FROM
+        value: marcelo.brandao@velinn.com
+      - key: EMAIL_SENDER
+        value: marcelo.brandao@velinn.com
+      - key: HUB_URL
+        value: https://velinn-hub.onrender.com
+      - key: NOTIF_EMAILS
+        sync: false

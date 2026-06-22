@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+requests
+google-auth
+google-api-python-client
+reportlab
