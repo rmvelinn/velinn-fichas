@@ -22,7 +22,8 @@ EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "marcelo.brandao@velinn.com")
 GMAIL_SA_JSON = os.environ.get("GMAIL_SA_JSON", "")
 DRIVE_SA_JSON = os.environ.get("DRIVE_SA_JSON", GMAIL_SA_JSON)
 HUB_URL       = os.environ.get("HUB_URL",  "https://velinn-hub.onrender.com")
-NOTIF_EMAILS  = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
+NOTIF_EMAILS        = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
+FICHAS_NOTIF_SECRET = os.environ.get("FICHAS_NOTIF_SECRET", "")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
@@ -358,6 +359,17 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str):
     </p>
   </div>
 </div>"""
-    destinatarios = list({gerente_email} | set(NOTIF_EMAILS) - {""})
+    # Busca emails com notif_fichas=true do Hub
+    hub_emails = []
+    try:
+        if HUB_URL and FICHAS_NOTIF_SECRET:
+            r = req.get(f"{HUB_URL}/api/fichas/notif-emails",
+                             headers={"X-Notif-Secret": FICHAS_NOTIF_SECRET}, timeout=5)
+            if r.ok:
+                hub_emails = r.json().get("emails", [])
+    except Exception as e:
+        print(f"[notif] erro ao buscar emails do Hub: {e}")
+
+    destinatarios = list({gerente_email} | set(NOTIF_EMAILS) | set(hub_emails) - {""})
     for dest in destinatarios:
         _enviar_email(dest, assunto, plain, html)
