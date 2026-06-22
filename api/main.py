@@ -200,6 +200,10 @@ BASE = os.path.join(os.path.dirname(__file__), "..")
 def logo():
     return FileResponse(os.path.join(BASE, "logo.png"), media_type="image/png")
 
+@app.get("/favicon.svg")
+def favicon():
+    return FileResponse(os.path.join(BASE, "favicon.svg"), media_type="image/svg+xml")
+
 
 # ------------------------------------------------------------------
 # PÚBLICO — formulário do cliente
