@@ -99,7 +99,10 @@ def _drive_upload(folder_id: str, filename: str, content: bytes) -> str:
         service = build("drive", "v3", credentials=creds, cache_discovery=False)
         meta = {"name": filename, "parents": [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(content), mimetype="application/pdf")
-        f = service.files().create(body=meta, media_body=media, fields="id,webViewLink").execute()
+        f = service.files().create(
+            body=meta, media_body=media, fields="id,webViewLink",
+            supportsAllDrives=True
+        ).execute()
         link = f.get("webViewLink", "")
         print(f"[drive] upload OK: {link}")
         return link
