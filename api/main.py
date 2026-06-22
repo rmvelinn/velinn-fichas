@@ -222,7 +222,7 @@ def cadastro_info(token: str):
 
 
 @app.post("/api/cadastro/{token}/submeter")
-async def submeter_ficha(token: str, request: Request, bg: BackgroundTasks):
+async def submeter_ficha(token: str, request: Request):
     rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
     if not rows or not isinstance(rows, list):
         return JSONResponse({"ok": False, "msg": "Link inválido"}, status_code=404)
@@ -258,7 +258,8 @@ async def submeter_ficha(token: str, request: Request, bg: BackgroundTasks):
     ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}"})
     if not ok:
         return JSONResponse({"ok": False, "msg": "Erro ao salvar"}, status_code=500)
-    bg.add_task(_pos_submissao, {**f, **update})
+    # Roda de forma síncrona para evitar que o Render mate o processo antes de concluir
+    _pos_submissao({**f, **update})
     return JSONResponse({"ok": True})
 
 
