@@ -17,7 +17,6 @@
       align-items: center;
     }
 
-    /* Top bar */
     .topbar {
       width: 100%;
       background: #0d1117;
@@ -37,11 +36,7 @@
       padding: 40px 24px 80px;
     }
 
-    /* Hero */
-    .hero {
-      text-align: center;
-      margin-bottom: 40px;
-    }
+    .hero { text-align: center; margin-bottom: 40px; }
 
     .hero-tag {
       display: inline-block;
@@ -66,27 +61,19 @@
     }
     .hero-title span { color: #b48c50; }
 
-    .hero-sub {
-      font-size: 0.92rem;
-      color: #6b7280;
-      line-height: 1.6;
-    }
+    .hero-sub { font-size: 0.92rem; color: #6b7280; line-height: 1.6; }
 
-    /* Steps indicator */
     .steps {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0;
       margin-bottom: 36px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
     }
 
-    .step {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
+    .step { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
     .step-dot {
       width: 36px;
@@ -103,38 +90,24 @@
       background: #fff;
     }
 
-    .step.active .step-dot {
-      border-color: #b48c50;
-      background: #b48c50;
-      color: #fff;
-    }
+    .step.active .step-dot { border-color: #b48c50; background: #b48c50; color: #fff; }
+    .step.done .step-dot   { border-color: #4ade80; background: #4ade80; color: #fff; }
 
-    .step.done .step-dot {
-      border-color: #4ade80;
-      background: #4ade80;
-      color: #fff;
-    }
-
-    .step-label {
-      font-size: 0.7rem;
-      color: #9ca3af;
-      font-weight: 500;
-      white-space: nowrap;
-    }
+    .step-label { font-size: 0.7rem; color: #9ca3af; font-weight: 500; white-space: nowrap; }
     .step.active .step-label { color: #b48c50; font-weight: 600; }
-    .step.done .step-label { color: #4ade80; }
+    .step.done .step-label   { color: #4ade80; }
 
     .step-line {
       flex: 1;
       height: 2px;
       background: #e5e7eb;
-      max-width: 80px;
+      max-width: 60px;
       margin-bottom: 22px;
       transition: background 0.3s;
+      min-width: 20px;
     }
     .step-line.done { background: #4ade80; }
 
-    /* Card */
     .card {
       background: #fff;
       border-radius: 16px;
@@ -164,26 +137,12 @@
       font-size: 1rem;
     }
 
-    .card-sub {
-      font-size: 0.82rem;
-      color: #9ca3af;
-      margin-bottom: 24px;
-      padding-left: 42px;
-    }
+    .card-sub { font-size: 0.82rem; color: #9ca3af; margin-bottom: 24px; padding-left: 42px; }
 
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .form-grid .full { grid-column: 1 / -1; }
 
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
 
     label {
       font-size: 0.78rem;
@@ -213,20 +172,11 @@
     }
 
     input::placeholder { color: #9ca3af; }
-
     input.error { border-color: #ef4444; }
 
-    .field-hint {
-      font-size: 0.73rem;
-      color: #9ca3af;
-    }
+    .field-hint { font-size: 0.73rem; color: #9ca3af; }
 
-    /* Navigation */
-    .nav {
-      display: flex;
-      gap: 12px;
-      margin-top: 8px;
-    }
+    .nav { display: flex; gap: 12px; margin-top: 8px; }
 
     .btn-prev {
       flex: 1;
@@ -260,15 +210,10 @@
     .btn-next:active { transform: scale(0.98); }
     .btn-next:disabled { background: #d1d5db; cursor: not-allowed; }
 
-    /* Step panels */
     .step-panel { display: none; }
     .step-panel.active { display: block; }
 
-    /* Success */
-    .success {
-      text-align: center;
-      padding: 20px 0;
-    }
+    .success { text-align: center; padding: 20px 0; }
 
     .success-icon {
       width: 80px;
@@ -282,38 +227,15 @@
       font-size: 2.2rem;
     }
 
-    .success-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1a1a2e;
-      margin-bottom: 12px;
-    }
+    .success-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 12px; }
+    .success-text { font-size: 0.92rem; color: #6b7280; line-height: 1.7; max-width: 380px; margin: 0 auto; }
 
-    .success-text {
-      font-size: 0.92rem;
-      color: #6b7280;
-      line-height: 1.7;
-      max-width: 380px;
-      margin: 0 auto;
-    }
-
-    /* Already filled */
-    .already {
-      text-align: center;
-      padding: 60px 20px;
-    }
-
+    .already { text-align: center; padding: 60px 20px; }
     .already-icon { font-size: 3rem; margin-bottom: 16px; }
     .already-title { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
     .already-text { font-size: 0.9rem; color: #6b7280; }
 
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 20px;
-      color: #9ca3af;
-      font-size: 0.78rem;
-    }
+    .footer { text-align: center; padding: 20px; color: #9ca3af; font-size: 0.78rem; }
 
     .progress-bar {
       height: 3px;
@@ -330,12 +252,21 @@
       transition: width 0.4s ease;
     }
 
+    .lgpd-box {
+      background: #f9f5ee;
+      border: 1px solid #e8d8b0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 24px;
+    }
+
     @media (max-width: 600px) {
       .form-grid { grid-template-columns: 1fr; }
       .form-grid .full { grid-column: 1; }
       .card { padding: 24px 20px; }
       .hero-title { font-size: 1.4rem; }
       .container { padding: 28px 16px 60px; }
+      .step-line { max-width: 30px; }
     }
   </style>
 </head>
@@ -348,12 +279,10 @@
 
 <div class="container">
 
-  <!-- Loading state -->
   <div id="loading" style="text-align:center;padding:60px 20px;color:#9ca3af;">
     Carregando formulário...
   </div>
 
-  <!-- Already filled -->
   <div id="already" class="card" style="display:none">
     <div class="already">
       <div class="already-icon">✅</div>
@@ -362,7 +291,6 @@
     </div>
   </div>
 
-  <!-- Main form -->
   <div id="form-area" style="display:none">
 
     <div class="hero">
@@ -372,184 +300,12 @@
     </div>
 
     <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill" style="width:33%"></div>
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
 
-    <div class="steps">
-      <div class="step active" id="step-ind-1">
-        <div class="step-dot">1</div>
-        <div class="step-label">Empresa</div>
-      </div>
-      <div class="step-line" id="line-1"></div>
-      <div class="step" id="step-ind-2">
-        <div class="step-dot">2</div>
-        <div class="step-label">Sócio</div>
-      </div>
-      <div class="step-line" id="line-2"></div>
-      <div class="step" id="step-ind-3">
-        <div class="step-dot">3</div>
-        <div class="step-label">Testemunha</div>
-      </div>
-    </div>
+    <div class="steps" id="steps-container"></div>
+    <div id="panels-container"></div>
 
-    <!-- Step 1: Dados da Empresa -->
-    <div class="step-panel active" id="panel-1">
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon">🏢</div>
-          Dados da Empresa
-        </div>
-        <div class="card-sub">Informações da empresa que assina o contrato de parceria.</div>
-
-        <div class="form-grid">
-          <div class="field full">
-            <label>Razão Social <span class="req">*</span></label>
-            <input type="text" id="razao_social" placeholder="Nome jurídico completo" />
-          </div>
-          <div class="field full">
-            <label>Nome Fantasia <span class="req">*</span></label>
-            <input type="text" id="nome_fantasia" placeholder="Nome pelo qual é conhecido" />
-          </div>
-          <div class="field full">
-            <label>CNPJ <span class="req">*</span></label>
-            <input type="text" id="cnpj" placeholder="00.000.000/0000-00" maxlength="18" />
-          </div>
-          <div class="field full">
-            <label>Endereço <span class="req">*</span></label>
-            <input type="text" id="endereco" placeholder="Rua, número, complemento" />
-          </div>
-          <div class="field">
-            <label>Bairro <span class="req">*</span></label>
-            <input type="text" id="bairro" placeholder="Bairro" />
-          </div>
-          <div class="field">
-            <label>CEP <span class="req">*</span></label>
-            <input type="text" id="cep" placeholder="00000-000" maxlength="9" />
-          </div>
-          <div class="field">
-            <label>Cidade <span class="req">*</span></label>
-            <input type="text" id="cidade" placeholder="Cidade" />
-          </div>
-          <div class="field">
-            <label>Estado <span class="req">*</span></label>
-            <select id="estado">
-              <option value="">Selecione</option>
-              <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
-              <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
-              <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
-              <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
-              <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
-              <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
-              <option selected>SP</option><option>SE</option><option>TO</option>
-            </select>
-          </div>
-          <div class="field full">
-            <label>E-mail Administrativo <span class="req">*</span></label>
-            <input type="email" id="email_administrativo" placeholder="financeiro@empresa.com" />
-            <div class="field-hint">E-mail para contatos administrativos e financeiros.</div>
-          </div>
-        </div>
-
-        <div class="nav" style="margin-top:24px">
-          <button class="btn-next" onclick="irPara(2)">Próximo: Dados do Sócio →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 2: Dados do Sócio -->
-    <div class="step-panel" id="panel-2">
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon">👤</div>
-          Dados do Sócio
-        </div>
-        <div class="card-sub">Dados do sócio que irá assinar o contrato de parceria.</div>
-
-        <div class="form-grid">
-          <div class="field full">
-            <label>Nome Completo <span class="req">*</span></label>
-            <input type="text" id="socio_nome" placeholder="Nome como consta no documento" />
-          </div>
-          <div class="field">
-            <label>Data de Nascimento <span class="req">*</span></label>
-            <input type="date" id="socio_data_nascimento" />
-          </div>
-          <div class="field">
-            <label>Celular <span class="req">*</span></label>
-            <input type="tel" id="socio_celular" placeholder="(00) 00000-0000" maxlength="15" />
-          </div>
-          <div class="field">
-            <label>CPF <span class="req">*</span></label>
-            <input type="text" id="socio_cpf" placeholder="000.000.000-00" maxlength="14" />
-          </div>
-          <div class="field">
-            <label>RG <span class="req">*</span></label>
-            <input type="text" id="socio_rg" placeholder="0000000" />
-          </div>
-          <div class="field full">
-            <label>E-mail Pessoal <span class="req">*</span></label>
-            <input type="email" id="socio_email" placeholder="socio@email.com" />
-          </div>
-        </div>
-
-        <div class="nav" style="margin-top:24px">
-          <button class="btn-prev" onclick="irPara(1)">← Voltar</button>
-          <button class="btn-next" onclick="irPara(3)">Próximo: Testemunha →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Step 3: Testemunha -->
-    <div class="step-panel" id="panel-3">
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon">✍️</div>
-          Dados da Testemunha
-        </div>
-        <div class="card-sub">Dados de uma testemunha para o contrato (não pode ser o sócio).</div>
-
-        <div class="form-grid">
-          <div class="field full">
-            <label>Nome Completo <span class="req">*</span></label>
-            <input type="text" id="testemunha_nome" placeholder="Nome como consta no documento" />
-          </div>
-          <div class="field">
-            <label>Data de Nascimento <span class="req">*</span></label>
-            <input type="date" id="testemunha_data_nascimento" />
-          </div>
-          <div class="field">
-            <label>CPF <span class="req">*</span></label>
-            <input type="text" id="testemunha_cpf" placeholder="000.000.000-00" maxlength="14" />
-          </div>
-          <div class="field">
-            <label>RG <span class="req">*</span></label>
-            <input type="text" id="testemunha_rg" placeholder="0000000" />
-          </div>
-          <div class="field full">
-            <label>E-mail <span class="req">*</span></label>
-            <input type="email" id="testemunha_email" placeholder="testemunha@email.com" />
-          </div>
-        </div>
-
-        <div style="background:#f9f5ee;border:1px solid #e8d8b0;border-radius:10px;padding:16px;margin-top:24px;">
-          <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;text-transform:none;letter-spacing:0;">
-            <input type="checkbox" id="lgpd-consent" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:#b48c50;" />
-            <span style="font-size:0.82rem;color:#555;line-height:1.6;">
-              Declaro que as informações fornecidas são verdadeiras e autorizo a <strong>VELINN Hotels</strong> a tratar meus dados pessoais para fins de formalização de parceria, em conformidade com a
-              <strong>Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018)</strong>.
-              Os dados serão utilizados exclusivamente para este fim e não serão compartilhados com terceiros sem consentimento.
-            </span>
-          </label>
-        </div>
-
-        <div class="nav" style="margin-top:16px">
-          <button class="btn-prev" onclick="irPara(2)">← Voltar</button>
-          <button class="btn-next" id="btn-submit" onclick="submeter()">Enviar Ficha Cadastral ✓</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Success -->
     <div class="step-panel" id="panel-success">
       <div class="card">
         <div class="success">
@@ -563,7 +319,7 @@
       </div>
     </div>
 
-  </div><!-- /form-area -->
+  </div>
 
   <div class="footer">
     Seus dados estão protegidos e serão utilizados exclusivamente para formalização da parceria.<br>
@@ -575,56 +331,200 @@
 <script>
 const TOKEN = location.pathname.split('/').pop();
 let stepAtual = 1;
+let totalSteps = 2;
+let numTestemunhas = 1;
 
-async function init() {
-  try {
-    const res = await fetch(`/api/cadastro/${TOKEN}`).then(r => r.json());
-    document.getElementById('loading').style.display = 'none';
-    if (res.already) {
-      document.getElementById('already').style.display = 'block';
-      return;
-    }
-    if (!res.ok) {
-      document.getElementById('loading').innerHTML = '<p style="color:#ef4444">Link inválido ou expirado.</p>';
-      return;
-    }
-    document.getElementById('nome-pousada').textContent = res.nome_pousada;
-    document.getElementById('form-area').style.display = 'block';
-  } catch(e) {
-    document.getElementById('loading').innerHTML = '<p style="color:#ef4444">Erro ao carregar formulário.</p>';
-  }
+// ── LGPD HTML ─────────────────────────────────────────────────────
+function _lgpdHtml() {
+  return `
+    <div class="lgpd-box" id="lgpd-box">
+      <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="lgpd-consent" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:#b48c50;" />
+        <span style="font-size:0.82rem;color:#555;line-height:1.6;">
+          Declaro que as informações fornecidas são verdadeiras e autorizo a <strong>VELINN Hotels</strong> a tratar meus dados pessoais para fins de formalização de parceria, em conformidade com a
+          <strong>Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018)</strong>.
+          Os dados serão utilizados exclusivamente para este fim e não serão compartilhados com terceiros sem consentimento.
+        </span>
+      </label>
+    </div>`;
 }
 
+// ── PANELS ────────────────────────────────────────────────────────
+function _estadoOptions() {
+  const ufs = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+  return ufs.map(u => `<option${u==='SP'?' selected':''}>${u}</option>`).join('');
+}
+
+function _empresaPanel() {
+  return `
+    <div class="step-panel active" id="panel-1">
+      <div class="card">
+        <div class="card-title"><div class="card-title-icon">🏢</div>Dados da Empresa</div>
+        <div class="card-sub">Informações da empresa que assina o contrato de parceria.</div>
+        <div class="form-grid">
+          <div class="field full"><label>Razão Social <span class="req">*</span></label><input type="text" id="razao_social" placeholder="Nome jurídico completo" /></div>
+          <div class="field full"><label>Nome Fantasia <span class="req">*</span></label><input type="text" id="nome_fantasia" placeholder="Nome pelo qual é conhecido" /></div>
+          <div class="field full"><label>CNPJ <span class="req">*</span></label><input type="text" id="cnpj" placeholder="00.000.000/0000-00" maxlength="18" /></div>
+          <div class="field full"><label>Endereço <span class="req">*</span></label><input type="text" id="endereco" placeholder="Rua, número, complemento" /></div>
+          <div class="field"><label>Bairro <span class="req">*</span></label><input type="text" id="bairro" placeholder="Bairro" /></div>
+          <div class="field"><label>CEP <span class="req">*</span></label><input type="text" id="cep" placeholder="00000-000" maxlength="9" /></div>
+          <div class="field"><label>Cidade <span class="req">*</span></label><input type="text" id="cidade" placeholder="Cidade" /></div>
+          <div class="field"><label>Estado <span class="req">*</span></label><select id="estado"><option value="">Selecione</option>${_estadoOptions()}</select></div>
+          <div class="field full"><label>E-mail Administrativo <span class="req">*</span></label><input type="email" id="email_administrativo" placeholder="financeiro@empresa.com" /><div class="field-hint">E-mail para contatos administrativos e financeiros.</div></div>
+        </div>
+        <div class="nav" style="margin-top:24px">
+          <button class="btn-next" onclick="irPara(2)">Próximo: Dados do Sócio →</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _socioPanel() {
+  const isLast = numTestemunhas === 0;
+  const lgpd = isLast ? _lgpdHtml() : '';
+  const navMargin = isLast ? '16px' : '24px';
+  const nav = isLast
+    ? `<button class="btn-prev" onclick="irPara(1)">← Voltar</button>
+       <button class="btn-next" id="btn-submit" onclick="submeter()">Enviar Ficha Cadastral ✓</button>`
+    : `<button class="btn-prev" onclick="irPara(1)">← Voltar</button>
+       <button class="btn-next" onclick="irPara(3)">Próximo: Testemunha →</button>`;
+  return `
+    <div class="step-panel" id="panel-2">
+      <div class="card">
+        <div class="card-title"><div class="card-title-icon">👤</div>Dados do Sócio</div>
+        <div class="card-sub">Dados do sócio que irá assinar o contrato de parceria.</div>
+        <div class="form-grid">
+          <div class="field full"><label>Nome Completo <span class="req">*</span></label><input type="text" id="socio_nome" placeholder="Nome como consta no documento" /></div>
+          <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="socio_data_nascimento" /></div>
+          <div class="field"><label>Celular <span class="req">*</span></label><input type="tel" id="socio_celular" placeholder="(00) 00000-0000" maxlength="15" /></div>
+          <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="socio_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
+          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="socio_rg" placeholder="0000000" /></div>
+          <div class="field full"><label>E-mail Pessoal <span class="req">*</span></label><input type="email" id="socio_email" placeholder="socio@email.com" /></div>
+          <div class="field full"><label>Endereço Residencial <span class="req">*</span></label><input type="text" id="socio_endereco" placeholder="Rua, número, complemento, bairro, cidade" /></div>
+        </div>
+        ${lgpd}
+        <div class="nav" style="margin-top:${navMargin}">${nav}</div>
+      </div>
+    </div>`;
+}
+
+function _testemunhaPanel(i) {
+  const step = i + 2;
+  const isLast = i === numTestemunhas;
+  const lgpd = isLast ? _lgpdHtml() : '';
+  const navMargin = isLast ? '16px' : '24px';
+  const titulo = numTestemunhas > 1 ? `Testemunha ${i}` : 'Dados da Testemunha';
+  const sub = numTestemunhas > 1
+    ? `Dados da ${i}ª testemunha para o contrato (não pode ser o sócio).`
+    : 'Dados de uma testemunha para o contrato (não pode ser o sócio).';
+  const nav = isLast
+    ? `<button class="btn-prev" onclick="irPara(${step-1})">← Voltar</button>
+       <button class="btn-next" id="btn-submit" onclick="submeter()">Enviar Ficha Cadastral ✓</button>`
+    : `<button class="btn-prev" onclick="irPara(${step-1})">← Voltar</button>
+       <button class="btn-next" onclick="irPara(${step+1})">Próximo →</button>`;
+  return `
+    <div class="step-panel" id="panel-${step}">
+      <div class="card">
+        <div class="card-title"><div class="card-title-icon">✍️</div>${titulo}</div>
+        <div class="card-sub">${sub}</div>
+        <div class="form-grid">
+          <div class="field full"><label>Nome Completo <span class="req">*</span></label><input type="text" id="t${i}_nome" placeholder="Nome como consta no documento" /></div>
+          <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="t${i}_nasc" /></div>
+          <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="t${i}_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
+          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="t${i}_rg" placeholder="0000000" /></div>
+          <div class="field full"><label>E-mail <span class="req">*</span></label><input type="email" id="t${i}_email" placeholder="testemunha@email.com" /></div>
+        </div>
+        ${lgpd}
+        <div class="nav" style="margin-top:${navMargin}">${nav}</div>
+      </div>
+    </div>`;
+}
+
+// ── BUILD FORM ────────────────────────────────────────────────────
+function construirForm() {
+  totalSteps = 2 + numTestemunhas;
+
+  // Steps indicator
+  const labels = ['Empresa', 'Sócio'];
+  for (let i = 1; i <= numTestemunhas; i++) {
+    labels.push(numTestemunhas > 1 ? `Test. ${i}` : 'Testemunha');
+  }
+  let stepsHtml = '';
+  for (let i = 0; i < totalSteps; i++) {
+    if (i > 0) stepsHtml += `<div class="step-line" id="line-${i}"></div>`;
+    stepsHtml += `
+      <div class="step ${i === 0 ? 'active' : ''}" id="step-ind-${i+1}">
+        <div class="step-dot">${i+1}</div>
+        <div class="step-label">${labels[i]}</div>
+      </div>`;
+  }
+  document.getElementById('steps-container').innerHTML = stepsHtml;
+
+  // Panels
+  let panelsHtml = _empresaPanel() + _socioPanel();
+  for (let i = 1; i <= numTestemunhas; i++) panelsHtml += _testemunhaPanel(i);
+  document.getElementById('panels-container').innerHTML = panelsHtml;
+
+  // Masks
+  document.getElementById('cnpj').addEventListener('input', maskCNPJ);
+  document.getElementById('socio_cpf').addEventListener('input', maskCPF);
+  document.getElementById('cep').addEventListener('input', maskCEP);
+  document.getElementById('socio_celular').addEventListener('input', maskPhone);
+  for (let i = 1; i <= numTestemunhas; i++) {
+    document.getElementById(`t${i}_cpf`)?.addEventListener('input', maskCPF);
+  }
+
+  // CEP auto-fill
+  document.getElementById('cep').addEventListener('blur', async e => {
+    const cep = e.target.value.replace(/\D/g,'');
+    if (cep.length !== 8) return;
+    try {
+      const data = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json());
+      if (!data.erro) {
+        if (!document.getElementById('endereco').value) document.getElementById('endereco').value = data.logradouro || '';
+        if (!document.getElementById('bairro').value)   document.getElementById('bairro').value   = data.bairro || '';
+        if (!document.getElementById('cidade').value)   document.getElementById('cidade').value   = data.localidade || '';
+        if (data.uf) document.getElementById('estado').value = data.uf;
+      }
+    } catch {}
+  });
+
+  // Update progress to step 1
+  atualizarProgresso(1);
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────
 function irPara(n) {
   if (n > stepAtual && !validarStep(stepAtual)) return;
 
   document.getElementById(`panel-${stepAtual}`).classList.remove('active');
-  document.getElementById(`step-ind-${stepAtual}`).classList.remove('active');
-  document.getElementById(`step-ind-${stepAtual}`).classList.add('done');
+  const indAtual = document.getElementById(`step-ind-${stepAtual}`);
+  indAtual.classList.remove('active');
+  if (n > stepAtual) indAtual.classList.add('done');
 
   if (n < stepAtual) {
     document.getElementById(`step-ind-${n}`).classList.remove('done');
   }
 
   stepAtual = n;
-  const panel = document.getElementById(`panel-${n}`);
-  if (panel) {
-    panel.classList.add('active');
-    document.getElementById(`step-ind-${n}`).classList.add('active');
-    document.getElementById(`step-ind-${n}`).classList.remove('done');
-  }
+  document.getElementById(`panel-${n}`).classList.add('active');
+  const indN = document.getElementById(`step-ind-${n}`);
+  indN.classList.add('active');
+  indN.classList.remove('done');
 
-  const progresso = { 1: '33%', 2: '66%', 3: '100%' };
-  document.getElementById('progress-fill').style.width = progresso[n] || '100%';
-
-  if (n >= 2) document.getElementById('line-1').classList.add('done');
-  else document.getElementById('line-1').classList.remove('done');
-  if (n >= 3) document.getElementById('line-2').classList.add('done');
-  else document.getElementById('line-2').classList.remove('done');
-
+  atualizarProgresso(n);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function atualizarProgresso(n) {
+  document.getElementById('progress-fill').style.width = `${Math.round((n / totalSteps) * 100)}%`;
+  for (let i = 1; i < totalSteps; i++) {
+    const line = document.getElementById(`line-${i}`);
+    if (line) line.classList.toggle('done', n > i);
+  }
+}
+
+// ── VALIDATION ────────────────────────────────────────────────────
 function val(id) { return (document.getElementById(id)?.value || '').trim(); }
 
 function marcarErro(id, erro) {
@@ -632,50 +532,56 @@ function marcarErro(id, erro) {
   if (el) el.classList.toggle('error', erro);
 }
 
+function checkLgpd() {
+  const cb = document.getElementById('lgpd-consent');
+  if (!cb || cb.checked) return true;
+  const box = document.getElementById('lgpd-box');
+  if (box) { box.style.borderColor = '#ef4444'; box.style.background = '#fff5f5'; }
+  cb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return false;
+}
+
 function validarStep(n) {
   let ok = true;
 
   if (n === 1) {
-    const campos = ['razao_social','nome_fantasia','cnpj','endereco','bairro','cep','cidade','email_administrativo'];
-    campos.forEach(c => {
-      const vazio = !val(c);
-      marcarErro(c, vazio);
-      if (vazio) ok = false;
+    ['razao_social','nome_fantasia','cnpj','endereco','bairro','cep','cidade','email_administrativo'].forEach(c => {
+      const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
-    if (!val('estado')) { marcarErro('estado', true); ok = false; }
-    else marcarErro('estado', false);
+    if (!val('estado')) { marcarErro('estado', true); ok = false; } else marcarErro('estado', false);
   }
 
   if (n === 2) {
-    const campos = ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular'];
-    campos.forEach(c => {
-      const vazio = !val(c);
-      marcarErro(c, vazio);
-      if (vazio) ok = false;
+    ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular','socio_endereco'].forEach(c => {
+      const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
+    if (n === totalSteps && !checkLgpd()) ok = false;
   }
 
-  if (n === 3) {
-    const campos = ['testemunha_nome','testemunha_data_nascimento','testemunha_cpf','testemunha_rg','testemunha_email'];
-    campos.forEach(c => {
-      const vazio = !val(c);
-      marcarErro(c, vazio);
-      if (vazio) ok = false;
+  if (n >= 3) {
+    const i = n - 2;
+    [`t${i}_nome`,`t${i}_nasc`,`t${i}_cpf`,`t${i}_rg`,`t${i}_email`].forEach(c => {
+      const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
+    if (n === totalSteps && !checkLgpd()) ok = false;
   }
 
   return ok;
 }
 
+// ── SUBMIT ────────────────────────────────────────────────────────
 async function submeter() {
-  if (!validarStep(3)) return;
+  if (!validarStep(totalSteps)) return;
 
-  if (!document.getElementById('lgpd-consent').checked) {
-    const el = document.getElementById('lgpd-consent');
-    el.parentElement.parentElement.style.borderColor = '#ef4444';
-    el.parentElement.parentElement.style.background = '#fff5f5';
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
+  const testemunhas = [];
+  for (let i = 1; i <= numTestemunhas; i++) {
+    testemunhas.push({
+      nome:             val(`t${i}_nome`),
+      data_nascimento:  val(`t${i}_nasc`),
+      cpf:              val(`t${i}_cpf`),
+      rg:               val(`t${i}_rg`),
+      email:            val(`t${i}_email`),
+    });
   }
 
   const btn = document.getElementById('btn-submit');
@@ -683,26 +589,23 @@ async function submeter() {
   btn.textContent = 'Enviando...';
 
   const payload = {
-    razao_social:                val('razao_social'),
-    nome_fantasia:               val('nome_fantasia'),
-    cnpj:                        val('cnpj'),
-    endereco:                    val('endereco'),
-    bairro:                      val('bairro'),
-    cidade:                      val('cidade'),
-    estado:                      val('estado'),
-    cep:                         val('cep'),
-    email_administrativo:        val('email_administrativo'),
-    socio_nome:                  val('socio_nome'),
-    socio_data_nascimento:       val('socio_data_nascimento'),
-    socio_cpf:                   val('socio_cpf'),
-    socio_rg:                    val('socio_rg'),
-    socio_email:                 val('socio_email'),
-    socio_celular:               val('socio_celular'),
-    testemunha_nome:             val('testemunha_nome'),
-    testemunha_data_nascimento:  val('testemunha_data_nascimento'),
-    testemunha_cpf:              val('testemunha_cpf'),
-    testemunha_rg:               val('testemunha_rg'),
-    testemunha_email:            val('testemunha_email'),
+    razao_social:          val('razao_social'),
+    nome_fantasia:         val('nome_fantasia'),
+    cnpj:                  val('cnpj'),
+    endereco:              val('endereco'),
+    bairro:                val('bairro'),
+    cidade:                val('cidade'),
+    estado:                val('estado'),
+    cep:                   val('cep'),
+    email_administrativo:  val('email_administrativo'),
+    socio_nome:            val('socio_nome'),
+    socio_data_nascimento: val('socio_data_nascimento'),
+    socio_cpf:             val('socio_cpf'),
+    socio_rg:              val('socio_rg'),
+    socio_email:           val('socio_email'),
+    socio_celular:         val('socio_celular'),
+    socio_endereco:        val('socio_endereco'),
+    testemunhas,
   };
 
   try {
@@ -713,10 +616,9 @@ async function submeter() {
     }).then(r => r.json());
 
     if (res.ok) {
-      document.getElementById('panel-3').classList.remove('active');
-      document.getElementById('step-ind-3').classList.remove('active');
-      document.getElementById('step-ind-3').classList.add('done');
-      document.getElementById('line-2').classList.add('done');
+      document.getElementById(`panel-${totalSteps}`).classList.remove('active');
+      document.getElementById(`step-ind-${totalSteps}`).classList.remove('active');
+      document.getElementById(`step-ind-${totalSteps}`).classList.add('done');
       document.getElementById('panel-success').classList.add('active');
       document.getElementById('progress-fill').style.width = '100%';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -732,7 +634,7 @@ async function submeter() {
   }
 }
 
-// Masks
+// ── MASKS ─────────────────────────────────────────────────────────
 function maskCNPJ(e) {
   let v = e.target.value.replace(/\D/g,'').slice(0,14);
   v = v.replace(/^(\d{2})(\d)/,'$1.$2')
@@ -763,27 +665,29 @@ function maskPhone(e) {
   e.target.value = v;
 }
 
-document.getElementById('cnpj').addEventListener('input', maskCNPJ);
-document.getElementById('socio_cpf').addEventListener('input', maskCPF);
-document.getElementById('testemunha_cpf').addEventListener('input', maskCPF);
-document.getElementById('cep').addEventListener('input', maskCEP);
-document.getElementById('socio_celular').addEventListener('input', maskPhone);
-
-// CEP auto-fill
-document.getElementById('cep').addEventListener('blur', async e => {
-  const cep = e.target.value.replace(/\D/g,'');
-  if (cep.length !== 8) return;
+// ── INIT ──────────────────────────────────────────────────────────
+async function init() {
   try {
-    const data = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json());
-    if (!data.erro) {
-      if (!document.getElementById('endereco').value) document.getElementById('endereco').value = data.logradouro || '';
-      if (!document.getElementById('bairro').value) document.getElementById('bairro').value = data.bairro || '';
-      if (!document.getElementById('cidade').value) document.getElementById('cidade').value = data.localidade || '';
-      const est = document.getElementById('estado');
-      if (data.uf) est.value = data.uf;
+    const res = await fetch(`/api/cadastro/${TOKEN}`).then(r => r.json());
+    document.getElementById('loading').style.display = 'none';
+    if (res.already) {
+      document.getElementById('already').style.display = 'block';
+      return;
     }
-  } catch {}
-});
+    if (!res.ok) {
+      document.getElementById('loading').innerHTML = '<p style="color:#ef4444">Link inválido ou expirado.</p>';
+      document.getElementById('loading').style.display = 'block';
+      return;
+    }
+    numTestemunhas = typeof res.num_testemunhas === 'number' ? res.num_testemunhas : 1;
+    document.getElementById('nome-pousada').textContent = res.nome_pousada;
+    construirForm();
+    document.getElementById('form-area').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '<p style="color:#ef4444">Erro ao carregar formulário.</p>';
+    document.getElementById('loading').style.display = 'block';
+  }
+}
 
 init();
 </script>

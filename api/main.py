@@ -160,20 +160,25 @@ def _gerar_pdf(ficha: dict) -> bytes:
         ("E-mail Administrativo", ficha.get("email_administrativo")),
     ])
     section("DADOS DO SÓCIO (assina o contrato)", [
-        ("Nome",               ficha.get("socio_nome")),
-        ("Data de Nascimento", ficha.get("socio_data_nascimento")),
-        ("CPF",                ficha.get("socio_cpf")),
-        ("RG",                 ficha.get("socio_rg")),
-        ("E-mail",             ficha.get("socio_email")),
-        ("Celular",            ficha.get("socio_celular")),
+        ("Nome",                 ficha.get("socio_nome")),
+        ("Data de Nascimento",   ficha.get("socio_data_nascimento")),
+        ("CPF",                  ficha.get("socio_cpf")),
+        ("RG",                   ficha.get("socio_rg")),
+        ("E-mail",               ficha.get("socio_email")),
+        ("Celular",              ficha.get("socio_celular")),
+        ("Endereço Residencial", ficha.get("socio_endereco")),
     ])
-    section("DADOS DA TESTEMUNHA (para o contrato)", [
-        ("Nome",               ficha.get("testemunha_nome")),
-        ("Data de Nascimento", ficha.get("testemunha_data_nascimento")),
-        ("CPF",                ficha.get("testemunha_cpf")),
-        ("RG",                 ficha.get("testemunha_rg")),
-        ("E-mail",             ficha.get("testemunha_email")),
-    ])
+    testemunhas = ficha.get("testemunhas") or []
+    if isinstance(testemunhas, list) and testemunhas:
+        for i, t in enumerate(testemunhas):
+            lbl = f"TESTEMUNHA {i+1}" if len(testemunhas) > 1 else "DADOS DA TESTEMUNHA"
+            section(lbl, [
+                ("Nome",               t.get("nome")),
+                ("Data de Nascimento", t.get("data_nascimento")),
+                ("CPF",                t.get("cpf")),
+                ("RG",                 t.get("rg")),
+                ("E-mail",             t.get("email")),
+            ])
 
     story.append(Spacer(1, 20))
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc"), spaceAfter=8))
@@ -226,7 +231,7 @@ def cadastro_info(token: str):
     f = rows[0]
     if f["status"] == "preenchido":
         return JSONResponse({"ok": False, "already": True, "msg": "Este formulário já foi preenchido."})
-    return JSONResponse({"ok": True, "nome_pousada": f["nome_pousada"], "nome_proprietario": f["nome_proprietario"]})
+    return JSONResponse({"ok": True, "nome_pousada": f["nome_pousada"], "nome_proprietario": f["nome_proprietario"], "num_testemunhas": f.get("num_testemunhas", 1)})
 
 
 @app.post("/api/cadastro/{token}/submeter")
@@ -257,11 +262,8 @@ async def submeter_ficha(token: str, request: Request):
         "socio_rg":                   body.get("socio_rg", ""),
         "socio_email":                body.get("socio_email", ""),
         "socio_celular":              body.get("socio_celular", ""),
-        "testemunha_nome":            body.get("testemunha_nome", ""),
-        "testemunha_data_nascimento": body.get("testemunha_data_nascimento", ""),
-        "testemunha_cpf":             body.get("testemunha_cpf", ""),
-        "testemunha_rg":              body.get("testemunha_rg", ""),
-        "testemunha_email":           body.get("testemunha_email", ""),
+        "socio_endereco":             body.get("socio_endereco", ""),
+        "testemunhas":                body.get("testemunhas", []),
     }
     ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}"})
     if not ok:
