@@ -263,8 +263,12 @@ async def submeter_ficha(token: str, request: Request, bg: BackgroundTasks):
 
 
 def _pos_submissao(ficha: dict):
+    print(f"[pos_submissao] iniciando para {ficha.get('nome_pousada')} / token={ficha.get('token','')[:8]}")
+    print(f"[pos_submissao] drive_folder_id={ficha.get('drive_folder_id')} DRIVE_SA_JSON={'sim' if DRIVE_SA_JSON else 'NAO'} GMAIL_SA_JSON={'sim' if GMAIL_SA_JSON else 'NAO'}")
+
     try:
         pdf_bytes = _gerar_pdf(ficha)
+        print(f"[pdf] gerado OK ({len(pdf_bytes)} bytes)")
     except Exception as e:
         print(f"[pdf] erro: {e}")
         pdf_bytes = None
@@ -275,9 +279,12 @@ def _pos_submissao(ficha: dict):
         pdf_url = _drive_upload(ficha["drive_folder_id"], nome, pdf_bytes)
         if pdf_url:
             db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
+    else:
+        print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{ficha.get('drive_folder_id')}'")
 
     _enviar_email_agradecimento(ficha)
     _enviar_email_notificacao(ficha, pdf_url)
+    print(f"[pos_submissao] concluído")
 
 
 def _enviar_email_agradecimento(ficha: dict):
