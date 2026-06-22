@@ -447,7 +447,7 @@ function construirForm() {
   // Steps indicator
   const labels = ['Empresa', 'Sócio'];
   for (let i = 1; i <= numTestemunhas; i++) {
-    labels.push(numTestemunhas > 1 ? `Test. ${i}` : 'Testemunha');
+    labels.push(numTestemunhas > 1 ? `Testemunha ${i}` : 'Testemunha');
   }
   let stepsHtml = '';
   for (let i = 0; i < totalSteps; i++) {
