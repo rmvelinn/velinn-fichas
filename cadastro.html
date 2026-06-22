@@ -530,7 +530,18 @@
           </div>
         </div>
 
-        <div class="nav" style="margin-top:24px">
+        <div style="background:#f9f5ee;border:1px solid #e8d8b0;border-radius:10px;padding:16px;margin-top:24px;">
+          <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="checkbox" id="lgpd-consent" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:#b48c50;" />
+            <span style="font-size:0.82rem;color:#555;line-height:1.6;">
+              Declaro que as informações fornecidas são verdadeiras e autorizo a <strong>VELINN Hotels</strong> a tratar meus dados pessoais para fins de formalização de parceria, em conformidade com a
+              <strong>Lei Geral de Proteção de Dados (LGPD — Lei 13.709/2018)</strong>.
+              Os dados serão utilizados exclusivamente para este fim e não serão compartilhados com terceiros sem consentimento.
+            </span>
+          </label>
+        </div>
+
+        <div class="nav" style="margin-top:16px">
           <button class="btn-prev" onclick="irPara(2)">← Voltar</button>
           <button class="btn-next" id="btn-submit" onclick="submeter()">Enviar Ficha Cadastral ✓</button>
         </div>
@@ -657,6 +668,14 @@ function validarStep(n) {
 
 async function submeter() {
   if (!validarStep(3)) return;
+
+  if (!document.getElementById('lgpd-consent').checked) {
+    const el = document.getElementById('lgpd-consent');
+    el.parentElement.parentElement.style.borderColor = '#ef4444';
+    el.parentElement.parentElement.style.background = '#fff5f5';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
 
   const btn = document.getElementById('btn-submit');
   btn.disabled = true;

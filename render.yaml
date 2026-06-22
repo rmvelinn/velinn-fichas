@@ -14,7 +14,7 @@ services:
       - key: DRIVE_SA_JSON
         sync: false
       - key: EMAIL_FROM
-        value: marcelo.brandao@velinn.com
+        value: no-reply@velinn.com
       - key: EMAIL_SENDER
         value: marcelo.brandao@velinn.com
       - key: HUB_URL

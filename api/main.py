@@ -17,7 +17,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_CENTER
 
-EMAIL_FROM   = os.environ.get("EMAIL_FROM",   "marcelo.brandao@velinn.com")
+EMAIL_FROM   = os.environ.get("EMAIL_FROM",   "no-reply@velinn.com")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "marcelo.brandao@velinn.com")
 GMAIL_SA_JSON = os.environ.get("GMAIL_SA_JSON", "")
 DRIVE_SA_JSON = os.environ.get("DRIVE_SA_JSON", GMAIL_SA_JSON)
