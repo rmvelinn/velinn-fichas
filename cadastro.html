@@ -400,7 +400,7 @@ function _socioPanel() {
           <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="socio_data_nascimento" /></div>
           <div class="field"><label>Celular <span class="req">*</span></label><input type="tel" id="socio_celular" placeholder="(00) 00000-0000" maxlength="15" /></div>
           <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="socio_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
-          <div class="field"><label>RG</label><input type="text" id="socio_rg" placeholder="0000000" /></div>
+          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="socio_rg" placeholder="0000000" /></div>
           <div class="field full"><label>E-mail Pessoal <span class="req">*</span></label><input type="email" id="socio_email" placeholder="socio@email.com" /></div>
           <div class="field full"><label>Endereço Residencial <span class="req">*</span></label><input type="text" id="socio_endereco" placeholder="Rua / Avenida" /></div>
           <div class="field"><label>Número <span class="req">*</span></label><input type="text" id="socio_numero" placeholder="Nº" /></div>
@@ -435,7 +435,7 @@ function _testemunhaPanel(i) {
           <div class="field full"><label>Nome Completo <span class="req">*</span></label><input type="text" id="t${i}_nome" placeholder="Nome como consta no documento" /></div>
           <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="t${i}_nasc" /></div>
           <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="t${i}_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
-          <div class="field"><label>RG</label><input type="text" id="t${i}_rg" placeholder="0000000" /></div>
+          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="t${i}_rg" placeholder="0000000" /></div>
           <div class="field full"><label>E-mail <span class="req">*</span></label><input type="email" id="t${i}_email" placeholder="testemunha@email.com" /></div>
         </div>
         ${lgpd}
@@ -556,7 +556,7 @@ function validarStep(n) {
   }
 
   if (n === 2) {
-    ['socio_nome','socio_data_nascimento','socio_cpf','socio_email','socio_celular','socio_endereco','socio_numero'].forEach(c => {
+    ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular','socio_endereco','socio_numero'].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (n === totalSteps && !checkLgpd()) ok = false;
@@ -564,7 +564,7 @@ function validarStep(n) {
 
   if (n >= 3) {
     const i = n - 2;
-    [`t${i}_nome`,`t${i}_nasc`,`t${i}_cpf`,`t${i}_email`].forEach(c => {
+    [`t${i}_nome`,`t${i}_nasc`,`t${i}_cpf`,`t${i}_rg`,`t${i}_email`].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (n === totalSteps && !checkLgpd()) ok = false;
