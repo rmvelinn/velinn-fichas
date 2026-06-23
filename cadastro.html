@@ -323,7 +323,7 @@
 
   <div class="footer">
     Seus dados estão protegidos e serão utilizados exclusivamente para formalização da parceria.<br>
-    <strong>VELINN Hotels</strong>
+    <strong>VELINN Hotel</strong>
   </div>
 
 </div>
@@ -365,7 +365,9 @@ function _empresaPanel() {
           <div class="field full"><label>Razão Social <span class="req">*</span></label><input type="text" id="razao_social" placeholder="Nome jurídico completo" /></div>
           <div class="field full"><label>Nome Fantasia <span class="req">*</span></label><input type="text" id="nome_fantasia" placeholder="Nome pelo qual é conhecido" /></div>
           <div class="field full"><label>CNPJ <span class="req">*</span></label><input type="text" id="cnpj" placeholder="00.000.000/0000-00" maxlength="18" /></div>
-          <div class="field full"><label>Endereço <span class="req">*</span></label><input type="text" id="endereco" placeholder="Rua, número, complemento" /></div>
+          <div class="field full"><label>Endereço <span class="req">*</span></label><input type="text" id="endereco" placeholder="Rua / Avenida" /></div>
+          <div class="field"><label>Número <span class="req">*</span></label><input type="text" id="numero" placeholder="Nº" /></div>
+          <div class="field"><label>Complemento</label><input type="text" id="complemento" placeholder="Apto, sala, bloco..." /></div>
           <div class="field"><label>Bairro <span class="req">*</span></label><input type="text" id="bairro" placeholder="Bairro" /></div>
           <div class="field"><label>CEP <span class="req">*</span></label><input type="text" id="cep" placeholder="00000-000" maxlength="9" /></div>
           <div class="field"><label>Cidade <span class="req">*</span></label><input type="text" id="cidade" placeholder="Cidade" /></div>
@@ -398,9 +400,11 @@ function _socioPanel() {
           <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="socio_data_nascimento" /></div>
           <div class="field"><label>Celular <span class="req">*</span></label><input type="tel" id="socio_celular" placeholder="(00) 00000-0000" maxlength="15" /></div>
           <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="socio_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
-          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="socio_rg" placeholder="0000000" /></div>
+          <div class="field"><label>RG</label><input type="text" id="socio_rg" placeholder="0000000" /></div>
           <div class="field full"><label>E-mail Pessoal <span class="req">*</span></label><input type="email" id="socio_email" placeholder="socio@email.com" /></div>
-          <div class="field full"><label>Endereço Residencial <span class="req">*</span></label><input type="text" id="socio_endereco" placeholder="Rua, número, complemento, bairro, cidade" /></div>
+          <div class="field full"><label>Endereço Residencial <span class="req">*</span></label><input type="text" id="socio_endereco" placeholder="Rua / Avenida" /></div>
+          <div class="field"><label>Número <span class="req">*</span></label><input type="text" id="socio_numero" placeholder="Nº" /></div>
+          <div class="field"><label>Complemento</label><input type="text" id="socio_complemento" placeholder="Apto, sala, bloco..." /></div>
         </div>
         ${lgpd}
         <div class="nav" style="margin-top:${navMargin}">${nav}</div>
@@ -431,7 +435,7 @@ function _testemunhaPanel(i) {
           <div class="field full"><label>Nome Completo <span class="req">*</span></label><input type="text" id="t${i}_nome" placeholder="Nome como consta no documento" /></div>
           <div class="field"><label>Data de Nascimento <span class="req">*</span></label><input type="date" id="t${i}_nasc" /></div>
           <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="t${i}_cpf" placeholder="000.000.000-00" maxlength="14" /></div>
-          <div class="field"><label>RG <span class="req">*</span></label><input type="text" id="t${i}_rg" placeholder="0000000" /></div>
+          <div class="field"><label>RG</label><input type="text" id="t${i}_rg" placeholder="0000000" /></div>
           <div class="field full"><label>E-mail <span class="req">*</span></label><input type="email" id="t${i}_email" placeholder="testemunha@email.com" /></div>
         </div>
         ${lgpd}
@@ -545,14 +549,14 @@ function validarStep(n) {
   let ok = true;
 
   if (n === 1) {
-    ['razao_social','nome_fantasia','cnpj','endereco','bairro','cep','cidade','email_administrativo'].forEach(c => {
+    ['razao_social','nome_fantasia','cnpj','endereco','numero','bairro','cep','cidade','email_administrativo'].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (!val('estado')) { marcarErro('estado', true); ok = false; } else marcarErro('estado', false);
   }
 
   if (n === 2) {
-    ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular','socio_endereco'].forEach(c => {
+    ['socio_nome','socio_data_nascimento','socio_cpf','socio_email','socio_celular','socio_endereco','socio_numero'].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (n === totalSteps && !checkLgpd()) ok = false;
@@ -560,7 +564,7 @@ function validarStep(n) {
 
   if (n >= 3) {
     const i = n - 2;
-    [`t${i}_nome`,`t${i}_nasc`,`t${i}_cpf`,`t${i}_rg`,`t${i}_email`].forEach(c => {
+    [`t${i}_nome`,`t${i}_nasc`,`t${i}_cpf`,`t${i}_email`].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (n === totalSteps && !checkLgpd()) ok = false;
@@ -593,6 +597,8 @@ async function submeter() {
     nome_fantasia:         val('nome_fantasia'),
     cnpj:                  val('cnpj'),
     endereco:              val('endereco'),
+    numero:                val('numero'),
+    complemento:           val('complemento'),
     bairro:                val('bairro'),
     cidade:                val('cidade'),
     estado:                val('estado'),
@@ -605,6 +611,8 @@ async function submeter() {
     socio_email:           val('socio_email'),
     socio_celular:         val('socio_celular'),
     socio_endereco:        val('socio_endereco'),
+    socio_numero:          val('socio_numero'),
+    socio_complemento:     val('socio_complemento'),
     testemunhas,
   };
 

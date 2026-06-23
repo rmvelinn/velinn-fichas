@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
 from reportlab.lib.enums import TA_CENTER
 
 EMAIL_FROM   = os.environ.get("EMAIL_FROM",   "no-reply@velinn.com")
@@ -120,18 +120,28 @@ def _gerar_pdf(ficha: dict) -> bytes:
     dark = colors.HexColor("#1a1a2e")
     story = []
 
-    title_style = ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=18,
-                                  textColor=gold, alignment=TA_CENTER, spaceAfter=4)
-    sub_style   = ParagraphStyle("sub", fontName="Helvetica", fontSize=10,
-                                  textColor=colors.HexColor("#555555"), alignment=TA_CENTER, spaceAfter=16)
     section_style = ParagraphStyle("section", fontName="Helvetica-Bold", fontSize=11,
                                     textColor=gold, spaceBefore=14, spaceAfter=6)
     label_style = ParagraphStyle("label", fontName="Helvetica-Bold", fontSize=9, textColor=dark)
     value_style = ParagraphStyle("value", fontName="Helvetica",      fontSize=9, textColor=dark)
+    h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
+    h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
 
-    story.append(Paragraph("FICHA CADASTRAL VELINN", title_style))
-    story.append(Paragraph(ficha.get("nome_pousada", ""), sub_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=gold, spaceAfter=12))
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
+    logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
+    text_cell = [Paragraph("FICHA CADASTRAL VELINN", h_title), Paragraph(ficha.get("nome_pousada", ""), h_sub)]
+    hdr = Table([[logo_cell, text_cell]], colWidths=[3*cm, 14*cm])
+    hdr.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0d1117")),
+        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 12),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+        ("LEFTPADDING",  (0,0), (0,0), 14),
+        ("LEFTPADDING",  (1,0), (1,0), 12),
+        ("LINEBELOW",  (0,0), (-1,-1), 3, gold),
+    ]))
+    story.append(hdr)
+    story.append(Spacer(1, 12))
 
     def section(title, fields):
         story.append(Paragraph(title, section_style))
@@ -152,7 +162,7 @@ def _gerar_pdf(ficha: dict) -> bytes:
         ("Razão Social",          ficha.get("razao_social")),
         ("Nome Fantasia",         ficha.get("nome_fantasia")),
         ("CNPJ",                  ficha.get("cnpj")),
-        ("Endereço",              ficha.get("endereco")),
+        ("Endereço",              " ".join(filter(None, [ficha.get("endereco"), ficha.get("numero"), ficha.get("complemento")]))),
         ("Bairro",                ficha.get("bairro")),
         ("Cidade",                ficha.get("cidade")),
         ("Estado",                ficha.get("estado")),
@@ -166,7 +176,7 @@ def _gerar_pdf(ficha: dict) -> bytes:
         ("RG",                   ficha.get("socio_rg")),
         ("E-mail",               ficha.get("socio_email")),
         ("Celular",              ficha.get("socio_celular")),
-        ("Endereço Residencial", ficha.get("socio_endereco")),
+        ("End. Residencial",     " ".join(filter(None, [ficha.get("socio_endereco"), ficha.get("socio_numero"), ficha.get("socio_complemento")]))),
     ])
     testemunhas = ficha.get("testemunhas") or []
     if isinstance(testemunhas, list) and testemunhas:
@@ -187,7 +197,7 @@ def _gerar_pdf(ficha: dict) -> bytes:
         ts = datetime.fromisoformat(ts).strftime("%d/%m/%Y às %H:%M")
     except:
         pass
-    story.append(Paragraph(f"Preenchido em: {ts} · VELINN Hotels",
+    story.append(Paragraph(f"Preenchido em: {ts} · VELINN Hotel",
         ParagraphStyle("footer", fontName="Helvetica", fontSize=8,
                         textColor=colors.HexColor("#999999"), alignment=TA_CENTER)))
     doc.build(story)
@@ -251,6 +261,8 @@ async def submeter_ficha(token: str, request: Request):
         "nome_fantasia":              body.get("nome_fantasia", ""),
         "cnpj":                       body.get("cnpj", ""),
         "endereco":                   body.get("endereco", ""),
+        "numero":                     body.get("numero", ""),
+        "complemento":                body.get("complemento", ""),
         "bairro":                     body.get("bairro", ""),
         "cidade":                     body.get("cidade", ""),
         "estado":                     body.get("estado", ""),
@@ -263,6 +275,8 @@ async def submeter_ficha(token: str, request: Request):
         "socio_email":                body.get("socio_email", ""),
         "socio_celular":              body.get("socio_celular", ""),
         "socio_endereco":             body.get("socio_endereco", ""),
+        "socio_numero":               body.get("socio_numero", ""),
+        "socio_complemento":          body.get("socio_complemento", ""),
         "testemunhas":                body.get("testemunhas", []),
     }
     ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}"})
@@ -308,8 +322,8 @@ def _enviar_email_agradecimento(ficha: dict):
     plain = f"Olá, {nome}! Recebemos sua ficha cadastral de {pousada}. Em breve nossa equipe entrará em contato. VELINN Hotels"
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
-  <div style="background:#0d1117;padding:32px;text-align:center;border-bottom:3px solid #b48c50;">
-    <h1 style="color:#b48c50;font-size:22px;margin:0;">VELINN Hotels</h1>
+  <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
+    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:36px;" />
   </div>
   <div style="padding:32px;">
     <h2 style="color:#222;font-size:20px;">Ficha recebida com sucesso! ✓</h2>
@@ -320,8 +334,8 @@ def _enviar_email_agradecimento(ficha: dict):
     </p>
     <p style="color:#555;line-height:1.6;">Obrigado pela confiança!</p>
   </div>
-  <div style="background:#f5f5f5;padding:16px;text-align:center;">
-    <p style="color:#aaa;font-size:11px;margin:0;">VELINN Hotels · contato@velinn.com.br</p>
+  <div style="background:#0d1117;padding:16px;text-align:center;border-top:3px solid #b48c50;">
+    <p style="color:#888;font-size:11px;margin:0;">VELINN Hotel</p>
   </div>
 </div>"""
     _enviar_email(email, assunto, plain, html)
@@ -341,8 +355,9 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str):
     plain = f"A ficha de {pousada} foi preenchida por {ficha.get('nome_proprietario','')} em {ts}. Gerente: {gerente_nome}. PDF: {pdf_url or 'não gerado'}"
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
-  <div style="background:#0d1117;padding:24px;text-align:center;border-bottom:3px solid #b48c50;">
-    <h1 style="color:#b48c50;font-size:18px;margin:0;">VELINN · Nova Ficha Cadastral</h1>
+  <div style="background:#0d1117;padding:20px 32px;text-align:center;border-bottom:3px solid #b48c50;">
+    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:32px;display:block;margin:0 auto 8px;" />
+    <span style="color:#b48c50;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Nova Ficha Cadastral</span>
   </div>
   <div style="padding:28px;">
     <p style="font-size:16px;color:#222;margin-bottom:20px;">
