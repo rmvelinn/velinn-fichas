@@ -644,7 +644,7 @@ def _enviar_email_agradecimento(ficha: dict):
     nome    = ficha.get("nome_proprietario", "")
     pousada = ficha.get("nome_pousada", "")
     # deduplicate and filter empty
-    destinatarios = list(dict.fromkeys(e for e in [email_link, email_socio] if e))
+    destinatarios = list(dict.fromkeys(e.strip().lower() for e in [email_link, email_socio] if e))
     if not destinatarios:
         return
     assunto = f"Ficha recebida com sucesso — {pousada}"
