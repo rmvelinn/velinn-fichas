@@ -648,7 +648,7 @@ def _enviar_email_agradecimento(ficha: dict):
     if not destinatarios:
         return
     assunto = f"Ficha recebida com sucesso — {pousada}"
-    plain = f"Olá, {nome}! Recebemos a ficha cadastral de {pousada} com sucesso. Nosso time irá analisar as informações. O próximo passo é o envio do contrato de parceria — fique de olho no seu e-mail! Caso haja alguma pendência, nosso time comercial entrará em contato. Obrigado pela confiança! VELINN Hotel"
+    plain = f"Olá, {nome}! Recebemos a ficha cadastral de {pousada} com sucesso. Nosso time analisará as informações. O próximo passo é o envio do contrato de parceria — fique de olho no seu e-mail! Caso haja alguma pendência, nosso time comercial entrará em contato. Obrigado pela confiança! VELINN Hotel"
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
@@ -659,7 +659,7 @@ def _enviar_email_agradecimento(ficha: dict):
     <p style="color:#555;line-height:1.6;">Olá, <strong>{nome}</strong>!</p>
     <p style="color:#555;line-height:1.6;">
       Recebemos a ficha cadastral de <strong>{pousada}</strong> com sucesso.
-      Nosso time irá analisar as informações.
+      Nosso time analisará as informações.
     </p>
     <p style="color:#555;line-height:1.6;">
       O próximo passo é o envio do contrato de parceria — fique de olho no seu e-mail!
