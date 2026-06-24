@@ -532,6 +532,11 @@ def cadastro_info(token: str):
     f = rows[0]
     if f["status"] == "preenchido":
         return JSONResponse({"ok": False, "already": True, "msg": "Este formulário já foi preenchido."})
+    # Marca primeira visualização
+    if not f.get("visualizado_em"):
+        db_update("fichas_cadastrais",
+                  {"visualizado_em": datetime.now(timezone.utc).isoformat()},
+                  {"token": f"eq.{token}"})
     return JSONResponse({"ok": True, "nome_pousada": f["nome_pousada"], "nome_proprietario": f["nome_proprietario"], "num_testemunhas": f.get("num_testemunhas", 1)})
 
 
