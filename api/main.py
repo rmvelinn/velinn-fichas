@@ -466,24 +466,31 @@ def _pos_submissao(ficha: dict):
     # Busca CNPJ e salva Cartão + QSA no Drive
     cnpj = ficha.get("cnpj", "")
     folder_id = ficha.get("drive_folder_id", "")
+    cnpj_status = "⚠️ CNPJ não informado ou pasta não configurada"
     if cnpj and folder_id:
         try:
             dados_cnpj = _buscar_cnpj(cnpj)
             if dados_cnpj:
                 svc = _drive_service_rw()
                 if svc:
-                    pasta_docs      = _drive_get_or_create_folder(svc, folder_id, "Documentos")
+                    pasta_docs       = _drive_get_or_create_folder(svc, folder_id, "Documentos")
                     pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
                     cartao_bytes = _gerar_pdf_cartao_cnpj(dados_cnpj)
                     _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
                     qsa_bytes = _gerar_pdf_qsa(dados_cnpj)
                     _drive_upload(pasta_docs_hotel, "QSA.pdf", qsa_bytes)
-                    print(f"[cnpj] Cartão CNPJ e QSA salvos em Documentos/Documentos Hotel")
+                    cnpj_status = "✅ Cartão CNPJ e QSA gerados e salvos no Drive"
+                    print(f"[cnpj] {cnpj_status}")
+                else:
+                    cnpj_status = "❌ Erro: Drive não configurado"
+            else:
+                cnpj_status = f"❌ CNPJ {cnpj} não encontrado na Receita Federal"
         except Exception as e:
-            print(f"[cnpj] ERRO ao processar CNPJ: {e}")
+            cnpj_status = f"❌ Erro ao processar CNPJ: {e}"
+            print(f"[cnpj] {cnpj_status}")
 
     _enviar_email_agradecimento(ficha)
-    _enviar_email_notificacao(ficha, pdf_url)
+    _enviar_email_notificacao(ficha, pdf_url, cnpj_status)
     print(f"[pos_submissao] concluído")
 
 
@@ -520,7 +527,7 @@ def _enviar_email_agradecimento(ficha: dict):
         _enviar_email(dest, assunto, plain, html)
 
 
-def _enviar_email_notificacao(ficha: dict, pdf_url: str):
+def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
     pousada      = ficha.get("nome_pousada", "")
     gerente_email = ficha.get("gerente_email", "")
     gerente_nome  = ficha.get("gerente_nome", "")
@@ -549,6 +556,7 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str):
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Gerente</td><td style="padding:8px;">{gerente_nome}</td></tr>
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Preenchido em</td><td style="padding:8px;">{ts}</td></tr>
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">PDF</td><td style="padding:8px;">{pdf_link}</td></tr>
+      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Captura CNPJ</td><td style="padding:8px;">{cnpj_status}</td></tr>
     </table>
     <p style="margin-top:20px;font-size:13px;color:#666;">
       Acesse o <a href="{HUB_URL}/fichas" style="color:#b48c50;">painel de fichas</a> para ver todos os detalhes.
