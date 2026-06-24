@@ -313,13 +313,16 @@ def _pos_submissao(ficha: dict):
 
 
 def _enviar_email_agradecimento(ficha: dict):
-    email = ficha.get("email_proprietario", "")
-    nome  = ficha.get("nome_proprietario", "")
+    email_link  = ficha.get("email_proprietario", "")
+    email_socio = ficha.get("socio_email", "")
+    nome    = ficha.get("nome_proprietario", "")
     pousada = ficha.get("nome_pousada", "")
-    if not email:
+    # deduplicate and filter empty
+    destinatarios = list(dict.fromkeys(e for e in [email_link, email_socio] if e))
+    if not destinatarios:
         return
     assunto = f"Ficha recebida com sucesso — {pousada}"
-    plain = f"Olá, {nome}! Recebemos sua ficha cadastral de {pousada}. Em breve nossa equipe entrará em contato. VELINN Hotels"
+    plain = f"Olá, {nome}! Recebemos sua ficha cadastral de {pousada}. Em breve nossa equipe entrará em contato. VELINN Hotel"
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
@@ -338,7 +341,8 @@ def _enviar_email_agradecimento(ficha: dict):
     <p style="color:#888;font-size:11px;margin:0;">VELINN Hotel</p>
   </div>
 </div>"""
-    _enviar_email(email, assunto, plain, html)
+    for dest in destinatarios:
+        _enviar_email(dest, assunto, plain, html)
 
 
 def _enviar_email_notificacao(ficha: dict, pdf_url: str):
