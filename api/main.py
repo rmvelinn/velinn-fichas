@@ -126,62 +126,148 @@ def _buscar_cnpj(cnpj: str) -> dict:
 
 
 def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:
+    """Replica o layout oficial do Comprovante de Inscrição e Situação Cadastral da Receita Federal."""
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     buf = io.BytesIO()
+    W = A4[0] - 2.4*cm  # largura útil
     doc = SimpleDocTemplate(buf, pagesize=A4,
-        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    gold  = colors.HexColor("#b48c50")
-    dark  = colors.HexColor("#1a1a2e")
-    white = colors.white
+        leftMargin=1.2*cm, rightMargin=1.2*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+
+    BLACK = colors.black
+    WHITE = colors.white
+    GRAY  = colors.HexColor("#f2f2f2")
+
+    lbl  = ParagraphStyle("lbl",  fontName="Helvetica",      fontSize=6.5, textColor=BLACK, leading=9)
+    val  = ParagraphStyle("val",  fontName="Helvetica-Bold", fontSize=9,   textColor=BLACK, leading=12)
+    val2 = ParagraphStyle("val2", fontName="Helvetica",      fontSize=9,   textColor=BLACK, leading=12)
+    tit  = ParagraphStyle("tit",  fontName="Helvetica-Bold", fontSize=13,  textColor=BLACK, alignment=TA_CENTER, leading=18)
+    sub  = ParagraphStyle("sub",  fontName="Helvetica-Bold", fontSize=10,  textColor=BLACK, alignment=TA_CENTER, leading=14)
+    foot = ParagraphStyle("foot", fontName="Helvetica",      fontSize=7.5, textColor=BLACK, leading=11)
+
+    BORDER = TableStyle([
+        ("BOX",       (0,0),(-1,-1), 0.5, BLACK),
+        ("INNERGRID", (0,0),(-1,-1), 0.5, BLACK),
+        ("VALIGN",    (0,0),(-1,-1), "TOP"),
+        ("TOPPADDING",(0,0),(-1,-1), 3),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 3),
+        ("LEFTPADDING",(0,0),(-1,-1), 4),
+        ("RIGHTPADDING",(0,0),(-1,-1), 4),
+    ])
+
+    def cell(label, value, bold=True):
+        return [Paragraph(label, lbl), Paragraph(str(value or ""), val if bold else val2)]
+
+    def cell2(label, value):
+        return cell(label, value, bold=False)
+
     story = []
 
-    h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
-    h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
-    section_style = ParagraphStyle("sec", fontName="Helvetica-Bold", fontSize=11, textColor=gold, spaceBefore=14, spaceAfter=6)
-    label_style = ParagraphStyle("lbl", fontName="Helvetica-Bold", fontSize=9, textColor=dark)
-    value_style = ParagraphStyle("val", fontName="Helvetica",      fontSize=9, textColor=dark)
+    # ── Cabeçalho ──────────────────────────────────────────────────
+    cnpj_raw = "".join(c for c in (dados.get("cnpj") or "") if c.isdigit())
+    cnpj_fmt = f"{cnpj_raw[:2]}.{cnpj_raw[2:5]}.{cnpj_raw[5:8]}/{cnpj_raw[8:12]}-{cnpj_raw[12:]}" if len(cnpj_raw)==14 else dados.get("cnpj","")
 
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
-    logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
-    hdr = Table([[logo_cell, [Paragraph("CARTÃO CNPJ", h_title), Paragraph(dados.get("razao_social",""), h_sub)]]],
-                colWidths=[3*cm, 14*cm])
-    hdr.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0d1117")),
-        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
-        ("TOPPADDING", (0,0), (-1,-1), 12), ("BOTTOMPADDING", (0,0), (-1,-1), 12),
-        ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),12),
-        ("LINEBELOW",  (0,0),(-1,-1), 3, gold),
+    header = Table([
+        [
+            Paragraph("REPÚBLICA FEDERATIVA DO BRASIL\nCADASTRO NACIONAL DA PESSOA JURÍDICA", tit),
+        ]
+    ], colWidths=[W])
+    header.setStyle(TableStyle([
+        ("BOX",(0,0),(-1,-1),0.5,BLACK),
+        ("TOPPADDING",(0,0),(-1,-1),8),
+        ("BOTTOMPADDING",(0,0),(-1,-1),8),
     ]))
-    story += [hdr, Spacer(1, 12)]
+    story += [header]
 
-    def row(label, value):
-        if not value:
-            return []
-        return [Table([[Paragraph(label, label_style), Paragraph(str(value), value_style)]],
-                      colWidths=[5*cm, 12*cm],
-                      style=TableStyle([
-                          ("BACKGROUND",(0,0),(-1,-1), colors.HexColor("#f9f5ee")),
-                          ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.HexColor("#f9f5ee"), white]),
-                          ("TOPPADDING",(0,0),(-1,-1),5), ("BOTTOMPADDING",(0,0),(-1,-1),5),
-                          ("LEFTPADDING",(0,0),(-1,-1),8), ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#e5e7eb")),
-                      ])), Spacer(1,2)]
+    # linha CNPJ | COMPROVANTE | DATA ABERTURA
+    abertura = dados.get("data_inicio_atividade","")
+    row1 = Table([[
+        [Paragraph("NÚMERO DE INSCRIÇÃO", lbl), Paragraph(cnpj_fmt, val), Paragraph("MATRIZ", val)],
+        [Paragraph("COMPROVANTE DE INSCRIÇÃO E DE SITUAÇÃO CADASTRAL", sub)],
+        [Paragraph("DATA DE ABERTURA", lbl), Paragraph(abertura, val)],
+    ]], colWidths=[W*0.22, W*0.55, W*0.23])
+    row1.setStyle(BORDER)
+    story.append(row1)
 
-    cnpj_fmt = dados.get("cnpj","")
-    story.append(Paragraph("Dados da Empresa", section_style))
-    for item in [
-        ("CNPJ",              cnpj_fmt),
-        ("Razão Social",      dados.get("razao_social")),
-        ("Nome Fantasia",     dados.get("nome_fantasia")),
-        ("Situação",          dados.get("descricao_situacao_cadastral")),
-        ("Data Abertura",     dados.get("data_inicio_atividade")),
-        ("Natureza Jurídica", dados.get("natureza_juridica")),
-        ("Porte",             dados.get("porte")),
-        ("Capital Social",    f"R$ {dados.get('capital_social',0):,.2f}".replace(",","X").replace(".",",").replace("X",".") if dados.get("capital_social") else None),
-        ("CNAE Principal",    f"{dados.get('cnae_fiscal','')} — {dados.get('cnae_fiscal_descricao','')}" if dados.get("cnae_fiscal") else None),
-        ("Telefone",          dados.get("ddd_telefone_1")),
-        ("E-mail",            dados.get("email")),
-        ("Endereço",          ", ".join(filter(None,[dados.get("logradouro"), dados.get("numero"), dados.get("complemento"), dados.get("bairro"), dados.get("municipio"), dados.get("uf"), dados.get("cep")]))),
-    ]:
-        story += row(item[0], item[1])
+    # Nome empresarial
+    t = Table([[cell("NOME EMPRESARIAL", dados.get("razao_social",""))]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # Nome fantasia | Porte
+    t = Table([[
+        cell("TÍTULO DO ESTABELECIMENTO (NOME DE FANTASIA)", dados.get("nome_fantasia","")),
+        cell("PORTE", dados.get("porte","")),
+    ]], colWidths=[W*0.85, W*0.15])
+    t.setStyle(BORDER); story.append(t)
+
+    # CNAE principal
+    cnae_princ = f"{dados.get('cnae_fiscal','')} - {dados.get('cnae_fiscal_descricao','')}" if dados.get("cnae_fiscal") else ""
+    t = Table([[cell("CÓDIGO E DESCRIÇÃO DA ATIVIDADE ECONÔMICA PRINCIPAL", cnae_princ, bold=False)]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # CNAEs secundários
+    sec = dados.get("cnaes_secundarios") or []
+    sec_txt = "\n".join(f"{s.get('codigo','')} - {s.get('descricao','')}" for s in sec) if sec else "—"
+    t = Table([[cell2("CÓDIGO E DESCRIÇÃO DAS ATIVIDADES ECONÔMICAS SECUNDÁRIAS", sec_txt)]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # Natureza jurídica
+    t = Table([[cell2("CÓDIGO E DESCRIÇÃO DA NATUREZA JURÍDICA", dados.get("natureza_juridica",""))]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # Logradouro | Número | Complemento
+    t = Table([[
+        cell("LOGRADOURO", dados.get("logradouro","")),
+        cell("NÚMERO",     dados.get("numero","")),
+        cell("COMPLEMENTO",dados.get("complemento","")),
+    ]], colWidths=[W*0.55, W*0.15, W*0.30])
+    t.setStyle(BORDER); story.append(t)
+
+    # CEP | Bairro | Município | UF
+    t = Table([[
+        cell("CEP",            dados.get("cep","")),
+        cell("BAIRRO/DISTRITO",dados.get("bairro","")),
+        cell("MUNICÍPIO",      dados.get("municipio","")),
+        cell("UF",             dados.get("uf","")),
+    ]], colWidths=[W*0.15, W*0.25, W*0.50, W*0.10])
+    t.setStyle(BORDER); story.append(t)
+
+    # E-mail | Telefone
+    ddd = dados.get("ddd_telefone_1","")
+    tel_fmt = f"({ddd[:2]}) {ddd[2:]}" if len(ddd) >= 10 else ddd
+    t = Table([[
+        cell("ENDEREÇO ELETRÔNICO", (dados.get("email") or "").upper()),
+        cell("TELEFONE", tel_fmt),
+    ]], colWidths=[W*0.65, W*0.35])
+    t.setStyle(BORDER); story.append(t)
+
+    # EFR
+    t = Table([[cell2("ENTE FEDERATIVO RESPONSÁVEL (EFR)", dados.get("ente_federativo_responsavel") or "*****")]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # Situação cadastral | Data situação
+    t = Table([[
+        cell("SITUAÇÃO CADASTRAL", dados.get("descricao_situacao_cadastral","")),
+        cell("DATA DA SITUAÇÃO CADASTRAL", dados.get("data_situacao_cadastral","")),
+    ]], colWidths=[W*0.65, W*0.35])
+    t.setStyle(BORDER); story.append(t)
+
+    # Motivo
+    t = Table([[cell2("MOTIVO DE SITUAÇÃO CADASTRAL", dados.get("motivo_situacao_cadastral") or "")]], colWidths=[W])
+    t.setStyle(BORDER); story.append(t)
+
+    # Situação especial | Data
+    t = Table([[
+        cell2("SITUAÇÃO ESPECIAL", dados.get("situacao_especial") or "********"),
+        cell("DATA DA SITUAÇÃO ESPECIAL", dados.get("data_situacao_especial") or "********"),
+    ]], colWidths=[W*0.65, W*0.35])
+    t.setStyle(BORDER); story.append(t)
+
+    # Rodapé
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Aprovado pela Instrução Normativa RFB nº 2.119, de 06 de dezembro de 2022.", foot))
+    from datetime import datetime as _dt
+    now = _dt.now().strftime("%d/%m/%Y às %H:%M:%S")
+    story.append(Paragraph(f"Emitido no dia {now} (data e hora de Brasília).&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Página: 1/1", foot))
 
     doc.build(story)
     return buf.getvalue()
