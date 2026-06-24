@@ -574,8 +574,12 @@ function validarStep(n) {
 }
 
 // ── SUBMIT ────────────────────────────────────────────────────────
+let _enviando = false;
+
 async function submeter() {
+  if (_enviando) return;
   if (!validarStep(totalSteps)) return;
+  _enviando = true;
 
   const testemunhas = [];
   for (let i = 1; i <= numTestemunhas; i++) {
@@ -630,13 +634,19 @@ async function submeter() {
       document.getElementById('panel-success').classList.add('active');
       document.getElementById('progress-fill').style.width = '100%';
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (res.already) {
+      document.getElementById('form-area').style.display = 'none';
+      document.getElementById('already').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       alert(res.msg || 'Erro ao enviar. Tente novamente.');
+      _enviando = false;
       btn.disabled = false;
       btn.textContent = 'Enviar Ficha Cadastral ✓';
     }
   } catch(e) {
     alert('Erro de conexão. Verifique sua internet e tente novamente.');
+    _enviando = false;
     btn.disabled = false;
     btn.textContent = 'Enviar Ficha Cadastral ✓';
   }

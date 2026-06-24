@@ -575,8 +575,12 @@ async def submeter_ficha(token: str, request: Request):
         "socio_complemento":          body.get("socio_complemento", ""),
         "testemunhas":                body.get("testemunhas", []),
     }
-    ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}"})
+    ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}", "status": "eq.pendente"})
     if not ok:
+        # Se não atualizou, pode ser race condition (já preenchido por outra requisição simultânea)
+        f2 = db_get("fichas_cadastrais", {"token": f"eq.{token}"})
+        if f2 and f2.get("status") == "preenchido":
+            return JSONResponse({"ok": False, "already": True, "msg": "Este formulário já foi preenchido."})
         return JSONResponse({"ok": False, "msg": "Erro ao salvar"}, status_code=500)
     # Roda de forma síncrona para evitar que o Render mate o processo antes de concluir
     _pos_submissao({**f, **update})
