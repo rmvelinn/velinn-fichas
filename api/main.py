@@ -274,58 +274,85 @@ def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:
 
 
 def _gerar_pdf_qsa(dados: dict) -> bytes:
+    """Replica o layout oficial do QSA da Receita Federal."""
+    from datetime import datetime as _dt
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
-        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    gold  = colors.HexColor("#b48c50")
-    dark  = colors.HexColor("#1a1a2e")
+        leftMargin=2*cm, rightMargin=2*cm, topMargin=2.5*cm, bottomMargin=2*cm)
+    BLACK = colors.black
+    W = A4[0] - 4*cm
+
+    titulo   = ParagraphStyle("tit", fontName="Helvetica",      fontSize=14, textColor=BLACK, leading=20)
+    bold_lbl = ParagraphStyle("bl",  fontName="Helvetica-Bold", fontSize=9,  textColor=BLACK, leading=13)
+    normal   = ParagraphStyle("nm",  fontName="Helvetica",      fontSize=9,  textColor=BLACK, leading=13)
+    intro    = ParagraphStyle("in",  fontName="Helvetica",      fontSize=9,  textColor=BLACK, leading=13, spaceBefore=14, spaceAfter=10)
+    foot     = ParagraphStyle("ft",  fontName="Helvetica",      fontSize=7.5,textColor=BLACK, leading=11)
+
+    BORDER = TableStyle([
+        ("BOX",         (0,0),(-1,-1), 0.5, BLACK),
+        ("TOPPADDING",  (0,0),(-1,-1), 6),
+        ("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING", (0,0),(-1,-1), 8),
+        ("RIGHTPADDING",(0,0),(-1,-1), 8),
+    ])
+
     story = []
 
-    h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
-    h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
-    section_style = ParagraphStyle("sec", fontName="Helvetica-Bold", fontSize=11, textColor=gold, spaceBefore=14, spaceAfter=6)
-    cell_style = ParagraphStyle("cel", fontName="Helvetica", fontSize=9, textColor=dark)
-    head_style = ParagraphStyle("hd", fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
+    # Título
+    story.append(Paragraph("Consulta Quadro de Sócios e Administradores - QSA", titulo))
+    story.append(Spacer(1, 10))
 
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
-    logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
-    hdr = Table([[logo_cell, [Paragraph("QSA — Quadro de Sócios e Administradores", h_title),
-                              Paragraph(dados.get("razao_social",""), h_sub)]]],
-                colWidths=[3*cm, 14*cm])
-    hdr.setStyle(TableStyle([
-        ("BACKGROUND", (0,0),(-1,-1), colors.HexColor("#0d1117")),
-        ("VALIGN",     (0,0),(-1,-1), "MIDDLE"),
-        ("TOPPADDING", (0,0),(-1,-1), 12), ("BOTTOMPADDING",(0,0),(-1,-1),12),
-        ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),12),
-        ("LINEBELOW",  (0,0),(-1,-1),3, gold),
-    ]))
-    story += [hdr, Spacer(1, 16)]
+    # Caixa cabeçalho
+    cnpj_raw = "".join(c for c in (dados.get("cnpj") or "") if c.isdigit())
+    cnpj_fmt = f"{cnpj_raw[:2]}.{cnpj_raw[2:5]}.{cnpj_raw[5:8]}/{cnpj_raw[8:12]}-{cnpj_raw[12:]}" if len(cnpj_raw)==14 else dados.get("cnpj","")
+    capital = dados.get("capital_social", 0) or 0
+    try:
+        capital_fmt = f"R${capital:,.2f}".replace(",","X").replace(".",",").replace("X",".")
+    except:
+        capital_fmt = str(capital)
 
+    cabecalho_content = [
+        Paragraph("<b>CNPJ:</b>", bold_lbl),
+        Paragraph(cnpj_fmt, normal),
+        Paragraph("<b>NOME EMPRESARIAL:</b>", bold_lbl),
+        Paragraph(dados.get("razao_social",""), normal),
+        Paragraph("<b>CAPITAL SOCIAL:</b>", bold_lbl),
+        Paragraph(capital_fmt, normal),
+    ]
+    cab = Table([[cabecalho_content]], colWidths=[W])
+    cab.setStyle(BORDER)
+    story.append(cab)
+    story.append(Paragraph(
+        "O Quadro de Sócios e Administradores(QSA) constante da base de dados do Cadastro Nacional"
+        " da Pessoa Jurídica (CNPJ) é o seguinte:",
+        intro
+    ))
+
+    # Um box por sócio
     qsa = dados.get("qsa") or []
-    if not qsa:
-        story.append(Paragraph("Nenhum sócio encontrado.", cell_style))
-    else:
-        story.append(Paragraph("Composição Societária", section_style))
-        table_data = [[
-            Paragraph("Nome", head_style),
-            Paragraph("Qualificação", head_style),
-            Paragraph("Participação", head_style),
-        ]]
-        for socio in qsa:
-            table_data.append([
-                Paragraph(socio.get("nome_socio","—"), cell_style),
-                Paragraph(socio.get("qualificacao_socio","—"), cell_style),
-                Paragraph(socio.get("pais_origem","Brasil"), cell_style),
-            ])
-        t = Table(table_data, colWidths=[7*cm, 5*cm, 5*cm])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,0), colors.HexColor("#0d1117")),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.HexColor("#f9f5ee"), colors.white]),
-            ("TOPPADDING",(0,0),(-1,-1),6), ("BOTTOMPADDING",(0,0),(-1,-1),6),
-            ("LEFTPADDING",(0,0),(-1,-1),8),
-            ("LINEBELOW",(0,0),(-1,-1),0.5, colors.HexColor("#e5e7eb")),
-        ]))
+    for socio in qsa:
+        socio_content = [
+            Paragraph("<b>Nome/Nome Empresarial:</b>", bold_lbl),
+            Paragraph(socio.get("nome_socio","—"), normal),
+            Paragraph("<b>Qualificação:</b>", bold_lbl),
+            Paragraph(socio.get("qualificacao_socio","—"), normal),
+        ]
+        t = Table([[socio_content]], colWidths=[W])
+        t.setStyle(BORDER)
         story.append(t)
+        story.append(Spacer(1, 8))
+
+    if not qsa:
+        story.append(Paragraph("Nenhum sócio encontrado na base de dados.", normal))
+
+    # Rodapé
+    story.append(Spacer(1, 16))
+    story.append(Paragraph(
+        "Para informações relativas à participação no QSA, acessar o e-CAC com certificado digital ou comparecer a uma unidade da RFB.",
+        foot
+    ))
+    now = _dt.now().strftime("%d/%m/%Y às %H:%M")
+    story.append(Paragraph(f"Emitido no dia {now} (data e hora de Brasília).", foot))
 
     doc.build(story)
     return buf.getvalue()
@@ -452,6 +479,28 @@ async def lifespan(app):
 
 app = FastAPI(title="VELINN Fichas", lifespan=lifespan)
 BASE = os.path.join(os.path.dirname(__file__), "..")
+
+
+@app.post("/api/interno/cnpj")
+async def interno_cnpj(request: Request):
+    secret = request.headers.get("X-Notif-Secret","")
+    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
+        return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    cnpj      = body.get("cnpj","")
+    folder_id = body.get("folder_id","")
+    dados = _buscar_cnpj(cnpj)
+    if not dados:
+        return JSONResponse({"ok": False, "msg": f"CNPJ {cnpj} não encontrado na Receita Federal"})
+    try:
+        svc = _drive_service_rw()
+        pasta_docs       = _drive_get_or_create_folder(svc, folder_id, "Documentos")
+        pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
+        _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", _gerar_pdf_cartao_cnpj(dados))
+        _drive_upload(pasta_docs_hotel, "QSA.pdf",         _gerar_pdf_qsa(dados))
+        return JSONResponse({"ok": True, "msg": "✅ Cartão CNPJ e QSA gerados com sucesso"})
+    except Exception as e:
+        return JSONResponse({"ok": False, "msg": str(e)})
 
 
 @app.get("/logo")
