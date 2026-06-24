@@ -89,6 +89,162 @@ def _enviar_email(para: str, assunto: str, corpo: str, html: str = ""):
         print(f"[email] FALHA: {e}")
 
 
+def _drive_service_rw():
+    if not DRIVE_SA_JSON:
+        return None
+    sa_info = json.loads(DRIVE_SA_JSON)
+    creds = service_account.Credentials.from_service_account_info(
+        sa_info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def _drive_get_or_create_folder(svc, parent_id: str, name: str) -> str:
+    """Retorna o id de uma subpasta, criando-a se não existir."""
+    q = (f"'{parent_id}' in parents and mimeType='application/vnd.google-apps.folder' "
+         f"and name='{name}' and trashed=false")
+    res = svc.files().list(q=q, fields="files(id)", supportsAllDrives=True,
+                           includeItemsFromAllDrives=True).execute()
+    files = res.get("files", [])
+    if files:
+        return files[0]["id"]
+    meta = {"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]}
+    f = svc.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
+    return f["id"]
+
+
+def _buscar_cnpj(cnpj: str) -> dict:
+    cnpj_digits = "".join(c for c in (cnpj or "") if c.isdigit())
+    if len(cnpj_digits) != 14:
+        return {}
+    try:
+        r = req.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}", timeout=10)
+        return r.json() if r.ok else {}
+    except Exception as e:
+        print(f"[cnpj] FALHA: {e}")
+        return {}
+
+
+def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    gold  = colors.HexColor("#b48c50")
+    dark  = colors.HexColor("#1a1a2e")
+    white = colors.white
+    story = []
+
+    h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
+    h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
+    section_style = ParagraphStyle("sec", fontName="Helvetica-Bold", fontSize=11, textColor=gold, spaceBefore=14, spaceAfter=6)
+    label_style = ParagraphStyle("lbl", fontName="Helvetica-Bold", fontSize=9, textColor=dark)
+    value_style = ParagraphStyle("val", fontName="Helvetica",      fontSize=9, textColor=dark)
+
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
+    logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
+    hdr = Table([[logo_cell, [Paragraph("CARTÃO CNPJ", h_title), Paragraph(dados.get("razao_social",""), h_sub)]]],
+                colWidths=[3*cm, 14*cm])
+    hdr.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#0d1117")),
+        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 12), ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+        ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),12),
+        ("LINEBELOW",  (0,0),(-1,-1), 3, gold),
+    ]))
+    story += [hdr, Spacer(1, 12)]
+
+    def row(label, value):
+        if not value:
+            return []
+        return [Table([[Paragraph(label, label_style), Paragraph(str(value), value_style)]],
+                      colWidths=[5*cm, 12*cm],
+                      style=TableStyle([
+                          ("BACKGROUND",(0,0),(-1,-1), colors.HexColor("#f9f5ee")),
+                          ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.HexColor("#f9f5ee"), white]),
+                          ("TOPPADDING",(0,0),(-1,-1),5), ("BOTTOMPADDING",(0,0),(-1,-1),5),
+                          ("LEFTPADDING",(0,0),(-1,-1),8), ("LINEBELOW",(0,0),(-1,-1),0.5,colors.HexColor("#e5e7eb")),
+                      ])), Spacer(1,2)]
+
+    cnpj_fmt = dados.get("cnpj","")
+    story.append(Paragraph("Dados da Empresa", section_style))
+    for item in [
+        ("CNPJ",              cnpj_fmt),
+        ("Razão Social",      dados.get("razao_social")),
+        ("Nome Fantasia",     dados.get("nome_fantasia")),
+        ("Situação",          dados.get("descricao_situacao_cadastral")),
+        ("Data Abertura",     dados.get("data_inicio_atividade")),
+        ("Natureza Jurídica", dados.get("natureza_juridica")),
+        ("Porte",             dados.get("porte")),
+        ("Capital Social",    f"R$ {dados.get('capital_social',0):,.2f}".replace(",","X").replace(".",",").replace("X",".") if dados.get("capital_social") else None),
+        ("CNAE Principal",    f"{dados.get('cnae_fiscal','')} — {dados.get('cnae_fiscal_descricao','')}" if dados.get("cnae_fiscal") else None),
+        ("Telefone",          dados.get("ddd_telefone_1")),
+        ("E-mail",            dados.get("email")),
+        ("Endereço",          ", ".join(filter(None,[dados.get("logradouro"), dados.get("numero"), dados.get("complemento"), dados.get("bairro"), dados.get("municipio"), dados.get("uf"), dados.get("cep")]))),
+    ]:
+        story += row(item[0], item[1])
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+def _gerar_pdf_qsa(dados: dict) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    gold  = colors.HexColor("#b48c50")
+    dark  = colors.HexColor("#1a1a2e")
+    story = []
+
+    h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
+    h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
+    section_style = ParagraphStyle("sec", fontName="Helvetica-Bold", fontSize=11, textColor=gold, spaceBefore=14, spaceAfter=6)
+    cell_style = ParagraphStyle("cel", fontName="Helvetica", fontSize=9, textColor=dark)
+    head_style = ParagraphStyle("hd", fontName="Helvetica-Bold", fontSize=9, textColor=colors.white)
+
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
+    logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
+    hdr = Table([[logo_cell, [Paragraph("QSA — Quadro de Sócios e Administradores", h_title),
+                              Paragraph(dados.get("razao_social",""), h_sub)]]],
+                colWidths=[3*cm, 14*cm])
+    hdr.setStyle(TableStyle([
+        ("BACKGROUND", (0,0),(-1,-1), colors.HexColor("#0d1117")),
+        ("VALIGN",     (0,0),(-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0),(-1,-1), 12), ("BOTTOMPADDING",(0,0),(-1,-1),12),
+        ("LEFTPADDING",(0,0),(0,0),14), ("LEFTPADDING",(1,0),(1,0),12),
+        ("LINEBELOW",  (0,0),(-1,-1),3, gold),
+    ]))
+    story += [hdr, Spacer(1, 16)]
+
+    qsa = dados.get("qsa") or []
+    if not qsa:
+        story.append(Paragraph("Nenhum sócio encontrado.", cell_style))
+    else:
+        story.append(Paragraph("Composição Societária", section_style))
+        table_data = [[
+            Paragraph("Nome", head_style),
+            Paragraph("Qualificação", head_style),
+            Paragraph("Participação", head_style),
+        ]]
+        for socio in qsa:
+            table_data.append([
+                Paragraph(socio.get("nome_socio","—"), cell_style),
+                Paragraph(socio.get("qualificacao_socio","—"), cell_style),
+                Paragraph(socio.get("pais_origem","Brasil"), cell_style),
+            ])
+        t = Table(table_data, colWidths=[7*cm, 5*cm, 5*cm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0), colors.HexColor("#0d1117")),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.HexColor("#f9f5ee"), colors.white]),
+            ("TOPPADDING",(0,0),(-1,-1),6), ("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("LEFTPADDING",(0,0),(-1,-1),8),
+            ("LINEBELOW",(0,0),(-1,-1),0.5, colors.HexColor("#e5e7eb")),
+        ]))
+        story.append(t)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
 def _drive_upload(folder_id: str, filename: str, content: bytes) -> str:
     if not DRIVE_SA_JSON or not folder_id:
         return ""
@@ -306,6 +462,25 @@ def _pos_submissao(ficha: dict):
             db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
     else:
         print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{ficha.get('drive_folder_id')}'")
+
+    # Busca CNPJ e salva Cartão + QSA no Drive
+    cnpj = ficha.get("cnpj", "")
+    folder_id = ficha.get("drive_folder_id", "")
+    if cnpj and folder_id:
+        try:
+            dados_cnpj = _buscar_cnpj(cnpj)
+            if dados_cnpj:
+                svc = _drive_service_rw()
+                if svc:
+                    pasta_docs      = _drive_get_or_create_folder(svc, folder_id, "Documentos")
+                    pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
+                    cartao_bytes = _gerar_pdf_cartao_cnpj(dados_cnpj)
+                    _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
+                    qsa_bytes = _gerar_pdf_qsa(dados_cnpj)
+                    _drive_upload(pasta_docs_hotel, "QSA.pdf", qsa_bytes)
+                    print(f"[cnpj] Cartão CNPJ e QSA salvos em Documentos/Documentos Hotel")
+        except Exception as e:
+            print(f"[cnpj] ERRO ao processar CNPJ: {e}")
 
     _enviar_email_agradecimento(ficha)
     _enviar_email_notificacao(ficha, pdf_url)
