@@ -482,26 +482,6 @@ async def lifespan(app):
 app = FastAPI(title="VELINN Fichas", lifespan=lifespan)
 BASE = os.path.join(os.path.dirname(__file__), "..")
 
-@app.get("/api/teste-email")
-def teste_email():
-    _enviar_email(
-        "alemaoilhabela@gmail.com",
-        "✅ Teste de E-mail — VELINN",
-        "E-mail de teste enviado com sucesso pelo sistema VELINN Fichas.",
-        """<div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">
-  <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
-    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:36px;" />
-  </div>
-  <div style="padding:32px;">
-    <h2 style="color:#222;">✅ E-mail de teste</h2>
-    <p style="color:#555;line-height:1.6;">O sistema de e-mail está funcionando corretamente!</p>
-  </div>
-  <div style="background:#0d1117;padding:16px;text-align:center;border-top:3px solid #b48c50;">
-    <p style="color:#888;font-size:11px;margin:0;">VELINN Hotel</p>
-  </div>
-</div>"""
-    )
-    return {"ok": True, "msg": "E-mail enviado para alemaoilhabela@gmail.com"}
 
 
 @app.post("/api/interno/cnpj")
