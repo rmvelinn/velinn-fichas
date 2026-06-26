@@ -5,7 +5,9 @@ import os, secrets, requests as req, json, base64, io
 from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+BRT = timezone(timedelta(hours=-3))
 import google.auth.transport.requests
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -463,7 +465,7 @@ def _gerar_pdf(ficha: dict) -> bytes:
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc"), spaceAfter=8))
     ts = ficha.get("preenchido_em", "")
     try:
-        ts = datetime.fromisoformat(ts).strftime("%d/%m/%Y às %H:%M")
+        ts = datetime.fromisoformat(ts).astimezone(BRT).strftime("%d/%m/%Y às %H:%M")
     except:
         pass
     story.append(Paragraph(f"Preenchido em: {ts} · VELINN Hotel",
@@ -681,7 +683,7 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
     gerente_nome  = ficha.get("gerente_nome", "")
     ts = ficha.get("preenchido_em", "")
     try:
-        ts = datetime.fromisoformat(ts).strftime("%d/%m/%Y às %H:%M")
+        ts = datetime.fromisoformat(ts).astimezone(BRT).strftime("%d/%m/%Y às %H:%M")
     except:
         pass
     pdf_link = f'<a href="{pdf_url}" style="color:#b48c50;">Baixar PDF</a>' if pdf_url else "(Drive não configurado)"
