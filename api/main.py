@@ -448,6 +448,8 @@ def _gerar_pdf(ficha: dict) -> bytes:
         ("E-mail",               ficha.get("socio_email")),
         ("Celular",              ficha.get("socio_celular")),
         ("End. Residencial",     " ".join(filter(None, [ficha.get("socio_endereco"), ficha.get("socio_numero"), ficha.get("socio_complemento")]))),
+        ("Bairro / CEP",         " / ".join(filter(None, [ficha.get("socio_bairro"), ficha.get("socio_cep")]))),
+        ("Cidade / Estado",      " / ".join(filter(None, [ficha.get("socio_cidade"), ficha.get("socio_estado")]))),
     ])
     testemunhas = ficha.get("testemunhas") or []
     if isinstance(testemunhas, list) and testemunhas:
@@ -576,6 +578,10 @@ async def submeter_ficha(token: str, request: Request):
         "socio_endereco":             body.get("socio_endereco", ""),
         "socio_numero":               body.get("socio_numero", ""),
         "socio_complemento":          body.get("socio_complemento", ""),
+        "socio_bairro":               body.get("socio_bairro", ""),
+        "socio_cep":                  body.get("socio_cep", ""),
+        "socio_cidade":               body.get("socio_cidade", ""),
+        "socio_estado":               body.get("socio_estado", ""),
         "testemunhas":                body.get("testemunhas", []),
     }
     ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}", "status": "eq.pendente"})

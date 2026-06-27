@@ -405,6 +405,10 @@ function _socioPanel() {
           <div class="field full"><label>Endereço Residencial <span class="req">*</span></label><input type="text" id="socio_endereco" placeholder="Rua / Avenida" /></div>
           <div class="field"><label>Número <span class="req">*</span></label><input type="text" id="socio_numero" placeholder="Nº" /></div>
           <div class="field"><label>Complemento</label><input type="text" id="socio_complemento" placeholder="Apto, sala, bloco..." /></div>
+          <div class="field"><label>Bairro <span class="req">*</span></label><input type="text" id="socio_bairro" placeholder="Bairro" /></div>
+          <div class="field"><label>CEP <span class="req">*</span></label><input type="text" id="socio_cep" placeholder="00000-000" maxlength="9" /></div>
+          <div class="field"><label>Cidade <span class="req">*</span></label><input type="text" id="socio_cidade" placeholder="Cidade" /></div>
+          <div class="field"><label>Estado <span class="req">*</span></label><select id="socio_estado"><option value="">Selecione</option>${_estadoOptions()}</select></div>
         </div>
         ${lgpd}
         <div class="nav" style="margin-top:${navMargin}">${nav}</div>
@@ -473,6 +477,7 @@ function construirForm() {
   document.getElementById('cnpj').addEventListener('input', maskCNPJ);
   document.getElementById('socio_cpf').addEventListener('input', maskCPF);
   document.getElementById('cep').addEventListener('input', maskCEP);
+  document.getElementById('socio_cep').addEventListener('input', maskCEP);
   document.getElementById('socio_celular').addEventListener('input', maskPhone);
   for (let i = 1; i <= numTestemunhas; i++) {
     document.getElementById(`t${i}_cpf`)?.addEventListener('input', maskCPF);
@@ -489,6 +494,21 @@ function construirForm() {
         if (!document.getElementById('bairro').value)   document.getElementById('bairro').value   = data.bairro || '';
         if (!document.getElementById('cidade').value)   document.getElementById('cidade').value   = data.localidade || '';
         if (data.uf) document.getElementById('estado').value = data.uf;
+      }
+    } catch {}
+  });
+
+  // CEP auto-fill sócio
+  document.getElementById('socio_cep').addEventListener('blur', async e => {
+    const cep = e.target.value.replace(/\D/g,'');
+    if (cep.length !== 8) return;
+    try {
+      const data = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json());
+      if (!data.erro) {
+        if (!document.getElementById('socio_endereco').value) document.getElementById('socio_endereco').value = data.logradouro || '';
+        if (!document.getElementById('socio_bairro').value)   document.getElementById('socio_bairro').value   = data.bairro || '';
+        if (!document.getElementById('socio_cidade').value)   document.getElementById('socio_cidade').value   = data.localidade || '';
+        if (data.uf) document.getElementById('socio_estado').value = data.uf;
       }
     } catch {}
   });
@@ -556,7 +576,7 @@ function validarStep(n) {
   }
 
   if (n === 2) {
-    ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular','socio_endereco','socio_numero'].forEach(c => {
+    ['socio_nome','socio_data_nascimento','socio_cpf','socio_rg','socio_email','socio_celular','socio_endereco','socio_numero','socio_bairro','socio_cep','socio_cidade'].forEach(c => {
       const empty = !val(c); marcarErro(c, empty); if (empty) ok = false;
     });
     if (n === totalSteps && !checkLgpd()) ok = false;
@@ -617,6 +637,10 @@ async function submeter() {
     socio_endereco:        val('socio_endereco'),
     socio_numero:          val('socio_numero'),
     socio_complemento:     val('socio_complemento'),
+    socio_bairro:          val('socio_bairro'),
+    socio_cep:             val('socio_cep'),
+    socio_cidade:          val('socio_cidade'),
+    socio_estado:          val('socio_estado'),
     testemunhas,
   };
 
