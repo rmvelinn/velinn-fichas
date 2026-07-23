@@ -619,9 +619,15 @@ def _pos_submissao(ficha: dict):
     pdf_url = ""
     if pdf_bytes and ficha.get("drive_folder_id"):
         nome = f"Ficha_{ficha['nome_pousada'].replace(' ','_')}.pdf"
-        pdf_url = _drive_upload(ficha["drive_folder_id"], nome, pdf_bytes)
-        if pdf_url:
-            db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
+        svc = _drive_service_rw()
+        if svc:
+            pasta_docs        = _drive_get_or_create_folder(svc, ficha["drive_folder_id"], "Documentos")
+            pasta_docs_velinn = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Velinn")
+            pdf_url = _drive_upload(pasta_docs_velinn, nome, pdf_bytes)
+            if pdf_url:
+                db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
+        else:
+            print(f"[drive] pulado — Drive não configurado")
     else:
         print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{ficha.get('drive_folder_id')}'")
 
