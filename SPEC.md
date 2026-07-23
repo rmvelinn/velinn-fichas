@@ -127,14 +127,18 @@ Registra histórico de edições da ficha (usada pelo modal "Ver Log" no hub).
 
 ### 4.3 Estrutura de pastas no Google Drive (por pousada)
 
+> Atualizada em 2026-07-23 após Fase H (ver seção 11) — só reflete o fluxo de
+> submissão inicial do `velinn-fichas`. O fluxo de edição via `velinn-hub`
+> ainda salva a Ficha na raiz (pendente, ver seção 11).
+
 ```
 📁 Pasta da Pousada  ← selecionada pelo gerente no hub
 └── 📁 Documentos
     ├── 📁 Documentos Hotel
-    │   ├── Ficha Cadastral {NomePousada}.pdf
     │   ├── CARTÃO CNPJ.pdf
     │   └── QSA.pdf
     └── 📁 Documentos Velinn
+        ├── Ficha_{NomePousada}.pdf
         └── [futuro] Contrato Parceria +Proposta Velinn & {NomePousada}.docx
 ```
 
@@ -299,7 +303,8 @@ prioridade imediata):**
 | E | Migração de infra (VPS próprio, `wikivelinn.com.br`, subdomínios `fichas.`/`hub.`, SSO via cookie compartilhado) | ⏳ Standby — planejada para depois da migração do WikiVelinn |
 | F | `supabase_hub.sql` — documentar schema das tabelas do hub (`usuarios`, `logs`, `sessoes`, `quadros`) | ⏳ Baixa prioridade |
 | G | Otimizar `_drive_upload` (recria cliente Drive 3–4× por submissão) | ⏳ Baixa prioridade — performance, não bug |
-| H | Fase H — PDF da Ficha (principal) vai para a pasta raiz da pousada desde a primeira submissão (nunca esteve em `Documentos/Documentos Hotel/`, diferente de CNPJ/QSA que sempre foram salvos lá corretamente). Aguardando confirmação com a diretoria: manter a raiz como padrão oficial (e corrigir o SPEC.md, não o código) ou migrar para dentro da subpasta (código + reorganização do histórico no Drive) | ⏳ Aguardando resposta da diretoria (consultada em 2026-07-23) |
+| H | Fase H — PDF da Ficha (principal) vai para a pasta raiz da pousada desde a primeira submissão (nunca esteve em `Documentos/Documentos Hotel/`, diferente de CNPJ/QSA que sempre foram salvos lá corretamente). Aguardando confirmação com a diretoria: manter a raiz como padrão oficial (e corrigir o SPEC.md, não o código) ou migrar para dentro da subpasta (código + reorganização do histórico no Drive) | ✅ Decisão da diretoria: 3ª forma — Ficha vai para `Documentos/Documentos Velinn/`, CNPJ/QSA continuam em `Documentos/Documentos Hotel/`. Sem reorganização de fichas antigas (resolvido manualmente antes). **Concluída e validada em produção em 2026-07-23** (commit `a4e881c`, push feito) — ver seção 10 para o histórico do bug encontrado na primeira tentativa (`9fae016`) e a correção aplicada. Ainda pendente: mesma mudança no fluxo de edição do `velinn-hub` (sessão separada) |
+| I | **Migração arquitetural — remover 100% da lógica de negócio de fichas do `velinn-hub`.** Hub passa a ser só SSO/permissões (`_tem_acesso_fichas`, `_tem_perm` continuam ali); geração de link, listagem, edição e log passam a viver inteiramente em `velinn-fichas`, com o hub apenas consumindo a API dele. Decidido em 2026-07-23: com só 3 fichas reais geradas até agora, o custo de migrar nunca será menor do que é hoje — motivo principal do timing. Planejada para execução em sessão dedicada (fase a fase, com SPEC.md de migração próprio), não durante o dia da decisão | 🔜 Planejada — próxima sessão dedicada |
 
 **Regra do framework aplicável:** nenhuma dessas fases entra em execução sem
 você abrir explicitamente com "Vamos executar a Fase [X]" e o plano ser
@@ -340,6 +345,67 @@ achados que geraram ação:
 (`velinn-fichas`, isolada) primeiro, testada e aprovada manualmente; só então
 Fase 1B (`velinn-hub`). Nenhuma correção nasce misturada com investigação —
 a auditoria em si não alterou nenhuma linha de código.
+
+---
+
+## 11. Fase H — bug encontrado na primeira tentativa e correção
+
+A diretoria decidiu (2026-07-23) uma 3ª estrutura para o PDF da Ficha
+Cadastral, diferente das duas opções originalmente propostas: Ficha vai para
+`Documentos/Documentos Velinn/`, mantendo CNPJ/QSA em `Documentos/Documentos
+Hotel/` como já era. Sem reorganização de fichas antigas (resolvido
+manualmente pela equipe antes desta decisão).
+
+**Primeira tentativa (commit `9fae016`) não funcionou em produção**, apesar de
+testes simulados com mocks terem passado. Sintoma: log mostrava
+`[drive] upload OK` para a Ficha sem nenhum erro, mas o arquivo continuava
+sendo salvo na raiz da pousada — `Documentos Velinn` nunca era criada em
+lugar nenhum.
+
+**Investigação (excluiu, nesta ordem):**
+- Deploy desatualizado (descartado — confirmado via Render Events, deploy
+  `9fae016` já estava "live" ~30s antes do teste)
+- Pasta "Documentos" duplicada por falta de `corpora`/latência de indexação
+  do Drive em Shared Drive (descartado — só existia uma pasta "Documentos",
+  sem duplicata)
+- `try/except` engolindo erro dentro de `_drive_get_or_create_folder`
+  (descartado — função não tem tratamento de exceção; se algo tivesse
+  falhado de verdade, o bloco de CNPJ logo depois não teria rodado)
+- Diff do commit divergindo do plano aprovado (descartado — `git show`
+  confirmou código idêntico ao planejado)
+- Arquivo reaproveitado de teste anterior mascarando o resultado (descartado
+  — usuário confirmou pasta nova selecionada para o teste)
+
+**Causa raiz identificada pelo usuário:** cada bloco (Ficha e CNPJ) resolvia
+a pasta "Documentos" **separadamente**, dentro da mesma requisição síncrona —
+não uma race condition de concorrência real (não há threads paralelas), mas
+resolução duplicada e sequencial do mesmo caminho de pastas, que por algum
+motivo (não totalmente isolado, mas não mais relevante após a correção) fazia
+a subpasta "Documentos Velinn" não ser criada corretamente.
+
+**Correção (commit `a4e881c`):** toda a estrutura de pastas
+(`Documentos` → `Documentos Hotel` e `Documentos Velinn`) passou a ser
+resolvida **uma única vez**, no início de `_pos_submissao`, com os IDs
+reaproveitados pelos blocos da Ficha e do CNPJ/QSA — em vez de cada bloco
+resolver por conta própria. Reduziu de 5 para 3 chamadas a
+`_drive_get_or_create_folder` por submissão. Log novo adicionado
+(`[drive] pastas resolvidas: documentos=... hotel=... velinn=...`) para
+visibilidade caso algo semelhante aconteça no futuro.
+
+**Efeito colateral aceito:** `Documentos Hotel` agora é criada em toda
+submissão com pasta configurada, mesmo sem CNPJ informado ainda (antes só era
+criada quando havia CNPJ e a consulta à BrasilAPI retornava dados). Aceito
+porque CNPJ é campo obrigatório do formulário — esse cenário só ocorreria em
+erro/edge case que seria corrigido antes da submissão real de qualquer forma.
+
+**Validado manualmente em produção em 2026-07-23**, com pousada de teste
+nova ("Pousada Marcelo Teste 2"): estrutura final confirmada visualmente —
+Ficha em `Documentos Velinn/`, CNPJ e QSA em `Documentos Hotel/`, nada solto
+na raiz.
+
+**Pendente:** aplicar a mesma mudança de destino no fluxo de edição do
+`velinn-hub` (modal de edição, versão `_V2`, `_V3`...), que ainda salva a
+Ficha na raiz — fica para uma sessão separada.
 
 ---
 
