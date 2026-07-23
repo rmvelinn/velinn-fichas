@@ -329,7 +329,7 @@
 </div>
 
 <script>
-const TOKEN = location.pathname.split('/').pop();
+const TOKEN = location.pathname.split('/').filter(Boolean).pop();
 let stepAtual = 1;
 let totalSteps = 2;
 let numTestemunhas = 1;
@@ -644,12 +644,17 @@ async function submeter() {
     testemunhas,
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
   try {
     const res = await fetch(`/api/cadastro/${TOKEN}/submeter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     }).then(r => r.json());
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       document.getElementById(`panel-${totalSteps}`).classList.remove('active');
@@ -669,10 +674,16 @@ async function submeter() {
       btn.textContent = 'Enviar Ficha Cadastral ✓';
     }
   } catch(e) {
-    alert('Erro de conexão. Verifique sua internet e tente novamente.');
-    _enviando = false;
-    btn.disabled = false;
-    btn.textContent = 'Enviar Ficha Cadastral ✓';
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      alert('O envio está demorando mais que o normal. Aguarde um momento antes de tentar novamente — sua ficha pode já ter sido recebida.');
+      btn.textContent = 'Aguarde...';
+    } else {
+      alert('Erro de conexão. Verifique sua internet e tente novamente.');
+      _enviando = false;
+      btn.disabled = false;
+      btn.textContent = 'Enviar Ficha Cadastral ✓';
+    }
   }
 }
 

@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
-import os, secrets, requests as req, json, base64, io
+import os, secrets, requests as req, json, base64, io, html as _html
 from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -42,12 +42,22 @@ def _headers():
 
 def db_select(table, params=None):
     r = req.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=_headers(), params=params or {})
-    return r.json() if r.ok else []
+    if not r.ok:
+        print(f"[db_select] erro {r.status_code} em {table}: {r.text[:200]}")
+        return []
+    return r.json()
 
 
 def db_update(table, data, params):
-    r = req.patch(f"{SUPABASE_URL}/rest/v1/{table}", headers=_headers(), json=data, params=params)
-    return r.ok
+    headers = {**_headers(), "Prefer": "return=representation,count=exact"}
+    r = req.patch(f"{SUPABASE_URL}/rest/v1/{table}", headers=headers, json=data, params=params)
+    if not r.ok:
+        print(f"[db_update] erro {r.status_code} em {table}: {r.text[:200]}")
+        return False
+    content_range = r.headers.get("Content-Range", "")
+    if content_range.endswith("/0"):
+        return False
+    return True
 
 
 def _gmail_token():
@@ -267,8 +277,7 @@ def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:
     # Rodapé
     story.append(Spacer(1, 8))
     story.append(Paragraph("Aprovado pela Instrução Normativa RFB nº 2.119, de 06 de dezembro de 2022.", foot))
-    from datetime import datetime as _dt
-    now = _dt.now().strftime("%d/%m/%Y às %H:%M:%S")
+    now = datetime.now(BRT).strftime("%d/%m/%Y às %H:%M:%S")
     story.append(Paragraph(f"Emitido no dia {now} (data e hora de Brasília).&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Página: 1/1", foot))
 
     doc.build(story)
@@ -277,7 +286,6 @@ def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:
 
 def _gerar_pdf_qsa(dados: dict) -> bytes:
     """Replica o layout oficial do QSA da Receita Federal."""
-    from datetime import datetime as _dt
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
         leftMargin=2*cm, rightMargin=2*cm, topMargin=2.5*cm, bottomMargin=2*cm)
@@ -353,7 +361,7 @@ def _gerar_pdf_qsa(dados: dict) -> bytes:
         "Para informações relativas à participação no QSA, acessar o e-CAC com certificado digital ou comparecer a uma unidade da RFB.",
         foot
     ))
-    now = _dt.now().strftime("%d/%m/%Y às %H:%M")
+    now = datetime.now(BRT).strftime("%d/%m/%Y às %H:%M")
     story.append(Paragraph(f"Emitido no dia {now} (data e hora de Brasília).", foot))
 
     doc.build(story)
@@ -587,7 +595,8 @@ async def submeter_ficha(token: str, request: Request):
     ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}", "status": "eq.pendente"})
     if not ok:
         # Se não atualizou, pode ser race condition (já preenchido por outra requisição simultânea)
-        f2 = db_get("fichas_cadastrais", {"token": f"eq.{token}"})
+        rows2 = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+        f2 = rows2[0] if rows2 and isinstance(rows2, list) else None
         if f2 and f2.get("status") == "preenchido":
             return JSONResponse({"ok": False, "already": True, "msg": "Este formulário já foi preenchido."})
         return JSONResponse({"ok": False, "msg": "Erro ao salvar"}, status_code=500)
@@ -658,6 +667,8 @@ def _enviar_email_agradecimento(ficha: dict):
         return
     assunto = f"Ficha recebida com sucesso — {pousada}"
     plain = f"Olá, {nome}! Recebemos a ficha cadastral de {pousada} com sucesso. Nosso time analisará as informações. O próximo passo é o envio do contrato de parceria — fique de olho no seu e-mail! Caso haja alguma pendência, nosso time comercial entrará em contato. Obrigado pela confiança! VELINN Hotel"
+    nome_safe    = _html.escape(nome)
+    pousada_safe = _html.escape(pousada)
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
@@ -665,9 +676,9 @@ def _enviar_email_agradecimento(ficha: dict):
   </div>
   <div style="padding:32px;">
     <h2 style="color:#222;font-size:20px;">Ficha recebida com sucesso! ✓</h2>
-    <p style="color:#555;line-height:1.6;">Olá, <strong>{nome}</strong>!</p>
+    <p style="color:#555;line-height:1.6;">Olá, <strong>{nome_safe}</strong>!</p>
     <p style="color:#555;line-height:1.6;">
-      Recebemos a ficha cadastral de <strong>{pousada}</strong> com sucesso.
+      Recebemos a ficha cadastral de <strong>{pousada_safe}</strong> com sucesso.
       Nosso time analisará as informações.
     </p>
     <p style="color:#555;line-height:1.6;">
@@ -696,6 +707,10 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
     pdf_link = f'<a href="{pdf_url}" style="color:#b48c50;">Baixar PDF</a>' if pdf_url else "(Drive não configurado)"
     assunto = f"[Ficha Preenchida] {pousada}"
     plain = f"A ficha de {pousada} foi preenchida por {ficha.get('nome_proprietario','')} em {ts}. Gerente: {gerente_nome}. PDF: {pdf_url or 'não gerado'}"
+    pousada_safe            = _html.escape(pousada)
+    nome_proprietario_safe  = _html.escape(ficha.get('nome_proprietario',''))
+    email_proprietario_safe = _html.escape(ficha.get('email_proprietario',''))
+    gerente_nome_safe       = _html.escape(gerente_nome)
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:20px 32px;text-align:center;border-bottom:3px solid #b48c50;">
@@ -704,13 +719,13 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
   </div>
   <div style="padding:28px;">
     <p style="font-size:16px;color:#222;margin-bottom:20px;">
-      <strong>{ficha.get('nome_proprietario','')}</strong> preencheu a ficha de <strong>{pousada}</strong>.
+      <strong>{nome_proprietario_safe}</strong> preencheu a ficha de <strong>{pousada_safe}</strong>.
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
-      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;width:40%;">Pousada</td><td style="padding:8px;">{pousada}</td></tr>
-      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Proprietário</td><td style="padding:8px;">{ficha.get('nome_proprietario','')}</td></tr>
-      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">E-mail</td><td style="padding:8px;">{ficha.get('email_proprietario','')}</td></tr>
-      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Gerente</td><td style="padding:8px;">{gerente_nome}</td></tr>
+      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;width:40%;">Pousada</td><td style="padding:8px;">{pousada_safe}</td></tr>
+      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Proprietário</td><td style="padding:8px;">{nome_proprietario_safe}</td></tr>
+      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">E-mail</td><td style="padding:8px;">{email_proprietario_safe}</td></tr>
+      <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Gerente</td><td style="padding:8px;">{gerente_nome_safe}</td></tr>
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Preenchido em</td><td style="padding:8px;">{ts}</td></tr>
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">PDF</td><td style="padding:8px;">{pdf_link}</td></tr>
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Captura CNPJ</td><td style="padding:8px;">{cnpj_status}</td></tr>
@@ -731,6 +746,6 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
     except Exception as e:
         print(f"[notif] erro ao buscar emails do Hub: {e}")
 
-    destinatarios = list({gerente_email} | set(NOTIF_EMAILS) | set(hub_emails) - {""})
+    destinatarios = [e for e in ({gerente_email} | set(NOTIF_EMAILS) | set(hub_emails)) if e]
     for dest in destinatarios:
         _enviar_email(dest, assunto, plain, html)

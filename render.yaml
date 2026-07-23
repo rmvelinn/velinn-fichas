@@ -16,8 +16,10 @@ services:
       - key: EMAIL_FROM
         value: no-reply@velinn.com
       - key: EMAIL_SENDER
-        value: marcelo.brandao@velinn.com
+        sync: false
       - key: HUB_URL
         value: https://velinn-hub.onrender.com
       - key: NOTIF_EMAILS
+        sync: false
+      - key: FICHAS_NOTIF_SECRET
         sync: false
