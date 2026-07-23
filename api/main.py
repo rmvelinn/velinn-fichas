@@ -609,6 +609,20 @@ def _pos_submissao(ficha: dict):
     print(f"[pos_submissao] iniciando para {ficha.get('nome_pousada')} / token={ficha.get('token','')[:8]}")
     print(f"[pos_submissao] drive_folder_id={ficha.get('drive_folder_id')} DRIVE_SA_JSON={'sim' if DRIVE_SA_JSON else 'NAO'} GMAIL_SA_JSON={'sim' if GMAIL_SA_JSON else 'NAO'}")
 
+    folder_id = ficha.get("drive_folder_id", "")
+    svc = None
+    pasta_docs = pasta_docs_hotel = pasta_docs_velinn = None
+    if folder_id:
+        svc = _drive_service_rw()
+        if svc:
+            pasta_docs        = _drive_get_or_create_folder(svc, folder_id, "Documentos")
+            pasta_docs_hotel  = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
+            pasta_docs_velinn = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Velinn")
+            print(f"[drive] pastas resolvidas: documentos={pasta_docs} "
+                  f"hotel={pasta_docs_hotel} velinn={pasta_docs_velinn}")
+        else:
+            print(f"[drive] pulado — Drive não configurado")
+
     try:
         pdf_bytes = _gerar_pdf(ficha)
         print(f"[pdf] gerado OK ({len(pdf_bytes)} bytes)")
@@ -617,45 +631,36 @@ def _pos_submissao(ficha: dict):
         pdf_bytes = None
 
     pdf_url = ""
-    if pdf_bytes and ficha.get("drive_folder_id"):
+    if pdf_bytes and pasta_docs_velinn:
         nome = f"Ficha_{ficha['nome_pousada'].replace(' ','_')}.pdf"
-        svc = _drive_service_rw()
-        if svc:
-            pasta_docs        = _drive_get_or_create_folder(svc, ficha["drive_folder_id"], "Documentos")
-            pasta_docs_velinn = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Velinn")
-            pdf_url = _drive_upload(pasta_docs_velinn, nome, pdf_bytes)
-            if pdf_url:
-                db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
-        else:
-            print(f"[drive] pulado — Drive não configurado")
+        pdf_url = _drive_upload(pasta_docs_velinn, nome, pdf_bytes)
+        if pdf_url:
+            db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
+    elif pdf_bytes and not pasta_docs_velinn:
+        print(f"[drive] pulado — pasta não resolvida (folder='{folder_id}')")
     else:
-        print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{ficha.get('drive_folder_id')}'")
+        print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{folder_id}'")
 
     # Busca CNPJ e salva Cartão + QSA no Drive
     cnpj = ficha.get("cnpj", "")
-    folder_id = ficha.get("drive_folder_id", "")
     cnpj_status = "⚠️ CNPJ não informado ou pasta não configurada"
-    if cnpj and folder_id:
+    if cnpj and pasta_docs_hotel:
         try:
             dados_cnpj = _buscar_cnpj(cnpj)
             if dados_cnpj:
-                svc = _drive_service_rw()
-                if svc:
-                    pasta_docs       = _drive_get_or_create_folder(svc, folder_id, "Documentos")
-                    pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
-                    cartao_bytes = _gerar_pdf_cartao_cnpj(dados_cnpj)
-                    _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
-                    qsa_bytes = _gerar_pdf_qsa(dados_cnpj)
-                    _drive_upload(pasta_docs_hotel, "QSA.pdf", qsa_bytes)
-                    cnpj_status = "✅ Cartão CNPJ e QSA gerados e salvos no Drive"
-                    print(f"[cnpj] {cnpj_status}")
-                else:
-                    cnpj_status = "❌ Erro: Drive não configurado"
+                cartao_bytes = _gerar_pdf_cartao_cnpj(dados_cnpj)
+                _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
+                qsa_bytes = _gerar_pdf_qsa(dados_cnpj)
+                _drive_upload(pasta_docs_hotel, "QSA.pdf", qsa_bytes)
+                cnpj_status = "✅ Cartão CNPJ e QSA gerados e salvos no Drive"
+                print(f"[cnpj] {cnpj_status}")
             else:
                 cnpj_status = f"❌ CNPJ {cnpj} não encontrado na Receita Federal"
         except Exception as e:
             cnpj_status = f"❌ Erro ao processar CNPJ: {e}"
             print(f"[cnpj] {cnpj_status}")
+    elif cnpj and not pasta_docs_hotel:
+        cnpj_status = "❌ Erro: Drive não configurado"
 
     _enviar_email_agradecimento(ficha)
     _enviar_email_notificacao(ficha, pdf_url, cnpj_status)
