@@ -445,18 +445,16 @@ def _gerar_pdf_qsa(dados: dict) -> bytes:
     return buf.getvalue()
 
 
-def _drive_upload(folder_id: str, filename: str, content: bytes) -> str:
-    if not DRIVE_SA_JSON or not folder_id:
+def _drive_upload(svc, folder_id: str, filename: str, content: bytes) -> str:
+    """Recebe o client do Drive já construído pelo chamador (Fase G —
+    antes recriava credenciais/client a cada chamada; agora reaproveita
+    o svc que cada função já monta para resolver pastas)."""
+    if not svc or not folder_id:
         return ""
     try:
-        sa_info = json.loads(DRIVE_SA_JSON)
-        creds = service_account.Credentials.from_service_account_info(
-            sa_info, scopes=["https://www.googleapis.com/auth/drive"],
-        )
-        service = build("drive", "v3", credentials=creds, cache_discovery=False)
         meta = {"name": filename, "parents": [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(content), mimetype="application/pdf")
-        f = service.files().create(
+        f = svc.files().create(
             body=meta, media_body=media, fields="id,webViewLink",
             supportsAllDrives=True
         ).execute()
@@ -586,8 +584,8 @@ def _cnpj_core(cnpj: str, folder_id: str):
         svc = _drive_service_rw()
         pasta_docs       = _drive_get_or_create_folder(svc, folder_id, "Documentos")
         pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
-        _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", _gerar_pdf_cartao_cnpj(dados))
-        _drive_upload(pasta_docs_hotel, "QSA.pdf",         _gerar_pdf_qsa(dados))
+        _drive_upload(svc, pasta_docs_hotel, "CARTÃO CNPJ.pdf", _gerar_pdf_cartao_cnpj(dados))
+        _drive_upload(svc, pasta_docs_hotel, "QSA.pdf",         _gerar_pdf_qsa(dados))
         return {"ok": True, "msg": "✅ Cartão CNPJ e QSA gerados com sucesso"}, 200
     except Exception as e:
         return {"ok": False, "msg": str(e)}, 200
@@ -839,7 +837,7 @@ def _editar_ficha_core(token: str, body: dict):
                     if svc:
                         pasta_docs        = _drive_get_or_create_folder(svc, folder_id, "Documentos")
                         pasta_docs_velinn = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Velinn")
-                        _drive_upload(pasta_docs_velinn, nome_pdf, pdf_bytes)
+                        _drive_upload(svc, pasta_docs_velinn, nome_pdf, pdf_bytes)
             except Exception as e:
                 print(f"[editar_ficha] erro ao gerar/enviar PDF da versão {nova_versao}: {e}")
     return {"ok": ok, "versao": nova_versao}, (200 if ok else 500)
@@ -1034,7 +1032,7 @@ def _pos_submissao(ficha: dict):
     pdf_url = ""
     if pdf_bytes and pasta_docs_velinn:
         nome = f"Ficha_{ficha['nome_pousada'].replace(' ','_')}.pdf"
-        pdf_url = _drive_upload(pasta_docs_velinn, nome, pdf_bytes)
+        pdf_url = _drive_upload(svc, pasta_docs_velinn, nome, pdf_bytes)
         if pdf_url:
             db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
     elif pdf_bytes and not pasta_docs_velinn:
@@ -1050,9 +1048,9 @@ def _pos_submissao(ficha: dict):
             dados_cnpj = _buscar_cnpj(cnpj)
             if dados_cnpj:
                 cartao_bytes = _gerar_pdf_cartao_cnpj(dados_cnpj)
-                _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
+                _drive_upload(svc, pasta_docs_hotel, "CARTÃO CNPJ.pdf", cartao_bytes)
                 qsa_bytes = _gerar_pdf_qsa(dados_cnpj)
-                _drive_upload(pasta_docs_hotel, "QSA.pdf", qsa_bytes)
+                _drive_upload(svc, pasta_docs_hotel, "QSA.pdf", qsa_bytes)
                 cnpj_status = "✅ Cartão CNPJ e QSA gerados e salvos no Drive"
                 print(f"[cnpj] {cnpj_status}")
             else:
