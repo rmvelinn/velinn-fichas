@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel de Fichas · VELINN</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0d1117;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 15% 40%, rgba(180,140,80,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 70%, rgba(180,140,80,0.05) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 32px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo { height: 40px; }
+    .user-badge { color: #6b7280; font-size: 0.82rem; }
+    .user-badge span { color: #b48c50; font-weight: 600; }
+
+    .header-links { display: flex; align-items: center; gap: 20px; }
+
+    .btn-back {
+      background: rgba(180,140,80,0.1);
+      border: 1px solid rgba(180,140,80,0.2);
+      border-radius: 8px;
+      padding: 7px 14px;
+      color: #b48c50;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-back:hover { background: rgba(180,140,80,0.2); }
+
+    .sair { color: #6b7280; font-size: 0.82rem; text-decoration: none; transition: color 0.2s; }
+    .sair:hover { color: #b48c50; }
+
+    main {
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 32px 48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .titulo { color: #e8e0d0; font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
+    .subtitulo { color: #6b7280; font-size: 0.9rem; margin-bottom: 32px; }
+
+    .aviso {
+      background: rgba(180,140,80,0.08);
+      border: 1px solid rgba(180,140,80,0.2);
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: #b48c50;
+      font-size: 0.85rem;
+      margin-bottom: 32px;
+    }
+
+    .btn-novo {
+      background: #b48c50;
+      color: #0d1117;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-novo:hover { opacity: 0.9; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      background: #161b22;
+      border: 1px solid rgba(180,140,80,0.2);
+      border-radius: 14px;
+      padding: 32px;
+      width: 100%;
+      max-width: 460px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-box h2 { color: #e8e0d0; font-size: 1.15rem; margin-bottom: 20px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; color: #9ca3af; font-size: 0.8rem; margin-bottom: 6px; }
+    .form-group .req { color: #b48c50; }
+    .form-group input, .form-group select {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: #e8e0d0;
+      font-size: 0.87rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+    .btn-cancelar {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 11px 20px;
+      color: #9ca3af;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .btn-gerar {
+      background: #b48c50;
+      color: #0d1117;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-gerar:disabled { opacity: 0.6; cursor: default; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #161b22;
+      border: 1px solid rgba(180,140,80,0.3);
+      color: #e8e0d0;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 20;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="/static/logo.png" alt="VELINN" />
+  <div class="header-links">
+    <span class="user-badge">Olá, <span id="nome-usuario">…</span></span>
+    <a href="https://velinn-hub.onrender.com/agentes" class="btn-back">← Hub</a>
+    <a href="/admin/logout" class="sair">Sair</a>
+  </div>
+</header>
+
+<main>
+  <div class="titulo">Fichas Cadastrais</div>
+  <div class="subtitulo">Painel de gestão de fichas de parceiros VELINN</div>
+
+  <div class="aviso">
+    Esta página está em migração do painel interno para o velinn-fichas (Fase I).
+    Por enquanto só a criação do link está disponível na tela — listagem, edição,
+    log e navegador de pastas do Drive chegam nas próximas fases.
+  </div>
+
+  <button class="btn-novo" onclick="abrirModal()">+ Gerar Link de Ficha</button>
+</main>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <h2>Gerar Link de Ficha Cadastral</h2>
+
+    <div class="form-group">
+      <label>Nome da Pousada <span class="req">*</span></label>
+      <input type="text" id="f-pousada" placeholder="Ex: Pousada Caminho do Mar" />
+    </div>
+    <div class="form-group">
+      <label>Nome do Proprietário <span class="req">*</span></label>
+      <input type="text" id="f-prop" placeholder="Nome completo" />
+    </div>
+    <div class="form-group">
+      <label>E-mail do Proprietário <span class="req">*</span></label>
+      <input type="email" id="f-email" placeholder="proprietario@pousada.com" />
+    </div>
+    <div class="form-group">
+      <label>Testemunhas</label>
+      <select id="f-testemunhas">
+        <option value="0">0</option>
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Pasta no Drive</label>
+      <input type="text" id="f-drive" placeholder="Navegador de pastas chega na próxima fase" readonly style="color:#6b7280;cursor:default;" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-gerar" id="btn-gerar" onclick="gerarLink()">Gerar e Enviar Link</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let meData = null;
+
+async function init() {
+  const me = await fetch('/api/admin/me').then(r => r.json());
+  if (!me.ok) { window.location.href = 'https://velinn-hub.onrender.com/agentes'; return; }
+  meData = me;
+  document.getElementById('nome-usuario').textContent = me.nome || me.usuario;
+}
+
+function abrirModal() {
+  document.getElementById('modal').classList.add('open');
+}
+
+function fecharModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) fecharModal();
+});
+
+function gerarLink() {
+  // Ligação real ao backend fica para quando o dropdown de gerentes e o
+  // navegador de pastas do Drive forem migrados (I.3/I.4).
+  toast('Disponível em breve');
+}
+
+function toast(msg, err = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+
+</body>
+</html>

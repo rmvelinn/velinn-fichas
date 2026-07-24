@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 import os, secrets, requests as req, json, base64, io, html as _html
 from email.message import EmailMessage
@@ -30,6 +30,23 @@ FICHAS_NOTIF_SECRET = os.environ.get("FICHAS_NOTIF_SECRET", "")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+
+# ── Sessão SSO (Fase I.2) ────────────────────────────────────────────────
+_ADMIN_SESSIONS: dict = {}   # {token: {"user": {...}, "expires": datetime}}
+ADMIN_SESSION_TTL_MIN = 24 * 60  # 24h — mesmo valor pro cookie e pra validação server-side
+
+
+def _admin_session_user(request: Request):
+    token = request.cookies.get("fichas_admin_session")
+    if not token:
+        return None
+    entry = _ADMIN_SESSIONS.get(token)
+    if not entry:
+        return None
+    if datetime.now(timezone.utc) > entry["expires"]:
+        del _ADMIN_SESSIONS[token]
+        return None
+    return entry["user"]
 
 
 def _headers():
@@ -580,6 +597,78 @@ def logo():
 @app.get("/favicon.svg")
 def favicon():
     return FileResponse(os.path.join(BASE, "favicon.svg"), media_type="image/svg+xml")
+
+
+@app.get("/static/logo.png")
+def static_logo():
+    return FileResponse(os.path.join(BASE, "static", "logo.png"), media_type="image/png")
+
+
+@app.get("/static/favicon.png")
+def static_favicon():
+    return FileResponse(os.path.join(BASE, "static", "favicon.png"), media_type="image/png")
+
+
+# ------------------------------------------------------------------
+# ADMIN — painel interno (Fase I.2: handshake de sessão SSO)
+# ------------------------------------------------------------------
+
+@app.get("/admin")
+def admin_page(request: Request, sso: str = None):
+    if sso:
+        try:
+            r = req.get(f"{HUB_URL}/api/sso/verificar", params={"token": sso}, timeout=8)
+            if r.ok:
+                data = r.json()
+                if data.get("ok"):
+                    token = secrets.token_hex(32)
+                    _ADMIN_SESSIONS[token] = {
+                        "user": data["user"],
+                        "expires": datetime.now(timezone.utc) + timedelta(minutes=ADMIN_SESSION_TTL_MIN),
+                    }
+                    resp = RedirectResponse("/admin", status_code=302)
+                    resp.set_cookie("fichas_admin_session", token, httponly=True,
+                                    samesite="lax", max_age=ADMIN_SESSION_TTL_MIN * 60)
+                    return resp
+        except Exception as e:
+            print(f"[sso] erro: {e}")
+    user = _admin_session_user(request)
+    if not user:
+        return RedirectResponse(f"{HUB_URL}/agentes", status_code=302)
+    return FileResponse(os.path.join(BASE, "admin.html"))
+
+
+@app.get("/api/admin/me")
+def admin_me(request: Request):
+    user = _admin_session_user(request)
+    if not user:
+        return JSONResponse({"ok": False}, status_code=401)
+    agentes = user.get("agentes") or []
+    nivel = user.get("nivel", "")
+    return JSONResponse({
+        "ok": True,
+        "usuario": user.get("usuario", ""),
+        "nome": user.get("nome", ""),
+        "nivel": nivel,
+        "agentes": agentes,
+        "pode_criar_link": nivel in ("admin", "gerente") or "pode_criar_link" in agentes,
+        "fichas_link":     "fichas_link" in agentes,
+        "fichas_pdf":      "fichas_pdf" in agentes,
+        "fichas_cnpj":     "fichas_cnpj" in agentes,
+        "fichas_editar":   "fichas_editar" in agentes,
+        "fichas_log":      "fichas_log" in agentes,
+        "fichas_deletar":  "fichas_deletar" in agentes,
+    })
+
+
+@app.get("/admin/logout")
+def admin_logout(request: Request):
+    token = request.cookies.get("fichas_admin_session")
+    if token:
+        _ADMIN_SESSIONS.pop(token, None)
+    resp = RedirectResponse(f"{HUB_URL}/agentes", status_code=302)
+    resp.delete_cookie("fichas_admin_session")
+    return resp
 
 
 # ------------------------------------------------------------------
