@@ -59,3 +59,55 @@
 
 ---
 
+## Fase I.5 (parcial) — pendências no `velinn-hub`, NÃO executadas
+
+> Nada nesta seção foi aplicado. `velinn-hub` não foi tocado em nenhum
+> momento desta sessão. Isto é só o levantamento detalhado, pra virar uma
+> sessão separada com você quando decidir.
+
+### 1. Mudança de URL na tabela `quadros` (Supabase) — requer sua autorização explícita, ainda não dada
+
+O card "Fichas" no painel `/agentes` do hub tem hoje `url = /fichas` (rota interna do hub). Precisa mudar para `https://velinn-fichas.onrender.com/admin` para o handshake de SSO ser acionado (o hub só injeta `?sso=` em URLs que não começam com `/`, conforme o `agentes.html`). **Não fiz essa mudança** — combinado desde o início desta sessão que isso exige autorização separada seguindo, mesmo em modo autônomo.
+
+### 2. Rotas do hub que ficam redundantes (endpoints com equivalente pronto em `velinn-fichas`)
+
+Seguras para remover **depois** que a URL do `quadros` for trocada e você validar que o painel novo funciona de ponta a ponta:
+
+| Rota no hub | Linha (`hub/api/main.py`) | Equivalente em `velinn-fichas` |
+|---|---|---|
+| `GET /fichas` (serve `fichas.html`) | 971 | `GET /admin` |
+| `GET /api/fichas` | 981 | `GET /api/admin/fichas` |
+| `GET /api/fichas/gerentes` | 995 | `GET /api/admin/gerentes` |
+| `GET /api/drive/pastas` | 888 | `GET /api/admin/drive/pastas` |
+| `POST /api/fichas/gerar` | 1004 | `POST /api/admin/fichas/gerar` (já delegava pro fichas desde a I.1b, mas fica redundante com o front novo) |
+| `PATCH /api/fichas/{token}/editar` | 1129 | `PATCH /api/admin/fichas/{token}/editar` |
+| `POST /api/fichas/{token}/cnpj` | 1163 | `POST /api/admin/fichas/{token}/cnpj` |
+| `GET /api/fichas/{token}/log` | 1193 | `GET /api/admin/fichas/{token}/log` |
+| `DELETE /api/fichas/{token}` | 1202 | `DELETE /api/admin/fichas/{token}` |
+| `GET /api/fichas/{token}/pdf` | 1834 | `GET /api/admin/fichas/{token}/pdf` |
+
+### 3. Código órfão que pode ser removido junto
+
+- `_enviar_email_link_cliente` (linha 1061) — órfã desde a Fase I.1b, nunca removida (decisão explícita na época: dívida técnica pra I.5).
+- `_gerar_pdf` (linha 73) e `_upload_drive` (linha 1108) — **confirmei que são usadas exclusivamente pelas rotas de fichas acima** (`editar_ficha` e `download_pdf`), nenhum outro recurso do hub (checklist, parceiro, etc.) depende delas. Seguras para remover junto.
+
+### 4. ⚠️ O que NÃO pode ser removido — compartilhado com outras partes do hub
+
+Investiguei linha por linha antes de listar qualquer coisa como "órfã", e encontrei dependências cruzadas importantes que **não são exclusivas de fichas**:
+
+- **`GET /api/fichas/lista-simples`** (linha 919) — usado por `checklist.html:472` (`fetch('/api/fichas/lista-simples')`). É uma dependência do módulo de **checklist**, não de fichas. **Não remover.**
+- **`_drive_service()`** (linha 877, a versão read-only) — usada por `listar_pastas` (linha 895, órfã, ok remover a rota) **e também por `GET /api/drive/folders`** (linha 1786), que é compartilhado entre fichas e checklist (`_tem_acesso_fichas(s) or _tem_acesso_checklist(s)`, linha 1782). **A função em si tem que ficar** — só a rota `/api/drive/pastas` (que só fichas usava) é que é redundante.
+- **`_tem_acesso_fichas`, `_pode_criar_link`, `_pode_editar_ficha`, `_tem_perm`** (linhas 950-968) — usadas não só nas rotas de fichas, mas também em `/auth/me` (linha 470-483) e num segundo endpoint `GET /api/me` (linha 1809-1829, aparentemente uma duplicata do `/auth/me` que também devolve flags de checklist) e em `/api/drive/folders` (compartilhado com checklist). **Essenciais, não remover.**
+- `GET /api/fichas/notif-emails` (linha 940) — usado pelo `velinn-fichas` (`_enviar_email_notificacao` chama isso via `X-Notif-Secret` pra saber quem notificar). **Não remover** — é contrato ativo entre os dois apps, nada a ver com esta migração de UI.
+
+### 5. Resumo do que a sessão do hub precisaria fazer
+
+1. Trocar a URL do card "Fichas" em `quadros` (autorização sua, específica).
+2. Validar em produção que `/admin?sso=...` funciona ponta a ponta.
+3. Remover as 10 rotas da tabela do item 2.
+4. Remover `_enviar_email_link_cliente`, `_gerar_pdf`, `_upload_drive`.
+5. **Não tocar** em `_drive_service()`, `_tem_acesso_fichas`/`_pode_criar_link`/`_pode_editar_ficha`/`_tem_perm`, `/api/fichas/lista-simples`, `/api/fichas/notif-emails`, `/api/drive/folders`, `/api/me`, `/auth/me` — todos compartilhados com outras partes do hub (checklist, parceiro, ou contrato ativo com o fichas).
+6. Resolver o Achado 1 original da I.2 no hub (`sso_gerar` incluir `"id"` no payload) — hoje contornado do lado do fichas via lookup direto no Supabase, mas ainda vale corrigir na origem por princípio.
+
+---
+
