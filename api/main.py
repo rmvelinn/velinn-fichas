@@ -483,7 +483,7 @@ def _gerar_pdf(ficha: dict) -> bytes:
     h_title = ParagraphStyle("ht", fontName="Helvetica-Bold", fontSize=14, textColor=gold, leading=18)
     h_sub   = ParagraphStyle("hs", fontName="Helvetica", fontSize=10, textColor=colors.HexColor("#cccccc"), leading=14)
 
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "static", "logo.png")
     logo_cell = RLImage(logo_path, width=2.2*cm, height=0.75*cm) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
     text_cell = [Paragraph("FICHA CADASTRAL VELINN", h_title), Paragraph(ficha.get("nome_pousada", ""), h_sub)]
     hdr = Table([[logo_cell, text_cell]], colWidths=[3*cm, 14*cm])
@@ -616,7 +616,7 @@ def _gerar_ficha_core(body: dict, usuario_gerador: str):
         return {"ok": False, "msg": "Selecione o gerente responsável"}, 400
 
     token = secrets.token_urlsafe(24)
-    num_testemunhas = int(body.get("num_testemunhas", 1))
+    num_testemunhas = int(body.get("num_testemunhas", 0))
     num_testemunhas = max(0, min(5, num_testemunhas))
     ok = db_insert("fichas_cadastrais", {
         "token":              token,
@@ -947,7 +947,7 @@ def cadastro_info(token: str):
         db_update("fichas_cadastrais",
                   {"visualizado_em": datetime.now(timezone.utc).isoformat()},
                   {"token": f"eq.{token}"})
-    return JSONResponse({"ok": True, "nome_pousada": f["nome_pousada"], "nome_proprietario": f["nome_proprietario"], "num_testemunhas": f.get("num_testemunhas", 1)})
+    return JSONResponse({"ok": True, "nome_pousada": f["nome_pousada"], "nome_proprietario": f["nome_proprietario"], "num_testemunhas": f.get("num_testemunhas", 0)})
 
 
 @app.post("/api/cadastro/{token}/submeter")

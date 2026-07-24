@@ -739,7 +739,7 @@ async function init() {
       document.getElementById('loading').style.display = 'block';
       return;
     }
-    numTestemunhas = typeof res.num_testemunhas === 'number' ? res.num_testemunhas : 1;
+    numTestemunhas = typeof res.num_testemunhas === 'number' ? res.num_testemunhas : 0;
     document.getElementById('nome-pousada').textContent = res.nome_pousada;
     construirForm();
     document.getElementById('form-area').style.display = 'block';

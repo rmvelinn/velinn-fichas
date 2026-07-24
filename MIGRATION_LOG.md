@@ -7,6 +7,63 @@
 
 ---
 
+## Correções pós-migração (não fazem parte da Fase I em si)
+
+Dois ajustes encontrados no teste end-to-end da migração, corrigidos numa
+sessão separada, depois de I.3-I.6 concluídas e da correção de permissão
+de PDF/CNPJ.
+
+### 1. Default de `num_testemunhas`: 1 → 0
+
+Comportamento pré-existente (não introduzido pela Fase I), corrigido em 4
+lugares: `admin.html` (opção `selected` do dropdown), `_gerar_ficha_core`
+(`api/main.py`), `cadastro_info` (`api/main.py`, fallback ao ler ficha do
+banco) e `cadastro.html` (fallback no frontend). Os 2 últimos não tinham
+sido citados originalmente pelo usuário, mas faziam parte da mesma cadeia
+de default — corrigidos junto para não deixar inconsistência parcial.
+
+### 2. 🐛 BUG — logo do PDF da Ficha regrediu para texto na Fase I.6
+
+**Isto é um bug introduzido pela própria Fase I.6, não um ajuste cosmético.**
+`_gerar_pdf` (a função que gera o PDF da Ficha Cadastral) sempre teve
+suporte a logo em imagem via `RLImage`, com fallback para o texto
+`Paragraph("VELINN", ...)` caso o arquivo não existisse:
+
+```python
+logo_path = os.path.join(os.path.dirname(__file__), "..", "logo.png")
+logo_cell = RLImage(logo_path, ...) if os.path.exists(logo_path) else Paragraph("VELINN", h_title)
+```
+
+A Fase I.6 removeu `logo.png` da raiz do projeto (migrado para
+`static/logo.png`) e atualizou `cadastro.html` + os 3 e-mails para o novo
+caminho — mas **não atualizou esta referência dentro de `_gerar_pdf`**,
+que continuou apontando para o arquivo removido. Resultado: desde o
+commit da I.6 (`4d12770`), todo PDF de Ficha gerado em produção usa o
+fallback de texto "VELINN" em vez do logo — sem erro nenhum visível, já
+que o `if os.path.exists(...)` foi desenhado justamente para degradar
+silenciosamente.
+
+**Corrigido**: `logo_path` agora aponta para `static/logo.png`. Nenhuma
+reestruturação de layout foi necessária — o suporte a imagem (dimensão,
+posicionamento na tabela do cabeçalho) já existia pronto, só a referência
+de caminho estava desatualizada.
+
+**Escopo confirmado**: só `_gerar_pdf` (Ficha). `_gerar_pdf_cartao_cnpj` e
+`_gerar_pdf_qsa` nunca referenciaram `logo_path`/`RLImage` — confirmado
+via grep antes de qualquer mudança, zero risco de tê-los afetado.
+
+### 3 cenários testados
+
+1. **Sucesso** — payload de geração de ficha sem `num_testemunhas` grava `0` no banco (não `1`). ✅
+2. **Sucesso** — leitura de uma ficha "antiga" sem a coluna `num_testemunhas` no banco retorna `0` no fallback (não `1`). ✅
+3. **Sucesso (o mais crítico)** — gerado um PDF real de ponta a ponta (não só inspeção de código-fonte): confirmado que `static/logo.png` existe no disco e que `_gerar_pdf` produz um PDF de ~18KB sem lançar exceção, usando o caminho novo. ✅
+
+### Pendências
+
+- Nenhuma automatizável a mais — recomendo abrir visualmente um PDF de ficha gerado em produção após o deploy pra confirmar que o logo aparece como imagem (a garantia por código já foi dada, mas é um artefato visual que vale conferência humana).
+
+---
+
 ## Fase I.3 — Listagem, navegador de pastas do Drive, dropdown de gerentes, "Gerar Link" ligado
 
 ### O que foi implementado
