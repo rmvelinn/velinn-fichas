@@ -120,17 +120,6 @@ def _admin_tem_perm(user: dict, perm: str) -> bool:
     return perm in (user.get("agentes") or [])
 
 
-def _admin_tem_perm_ou_admin(user: dict, perm: str) -> bool:
-    """Igual _admin_tem_perm, mas com bypass para nivel=admin — usado só
-    onde essa exceção foi explicitamente decidida (PDF/CNPJ, ver correção
-    de segurança pós-Fase I.4). Não usar em ações destrutivas/log
-    (deletar, editar, log) — SPEC.md 6.8 mantém granularidade obrigatória
-    mesmo para admin nesses casos."""
-    if not user:
-        return False
-    return user.get("nivel") == "admin" or perm in (user.get("agentes") or [])
-
-
 def _lookup_usuario(usuario: str) -> dict:
     """Busca id/nome/email na tabela usuarios (compartilhada com o hub) pelo
     username — resolve o Achado 1 da Fase I.2 (SSO não carrega "id") sem
@@ -887,7 +876,7 @@ def admin_deletar_ficha(token: str, request: Request):
 @app.get("/api/admin/fichas/{token}/pdf")
 def admin_download_pdf(token: str, request: Request):
     user = _admin_session_user(request)
-    if not user or not _admin_tem_perm_ou_admin(user, "fichas_pdf"):
+    if not user or not _admin_tem_perm(user, "fichas_pdf"):
         return JSONResponse({"ok": False}, status_code=403)
     rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
     if not rows or not isinstance(rows, list) or rows[0]["status"] != "preenchido":
@@ -905,7 +894,7 @@ def admin_download_pdf(token: str, request: Request):
 @app.post("/api/admin/fichas/{token}/cnpj")
 def admin_regenerar_cnpj(token: str, request: Request):
     user = _admin_session_user(request)
-    if not user or not _admin_tem_perm_ou_admin(user, "fichas_cnpj"):
+    if not user or not _admin_tem_perm(user, "fichas_cnpj"):
         return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
     rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
     if not rows or not isinstance(rows, list):
