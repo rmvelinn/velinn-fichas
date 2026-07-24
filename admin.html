@@ -33,7 +33,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 28px 32px;
+      padding: 6px 32px;
     }
 
     .logo { height: 50px; }
@@ -61,7 +61,7 @@
     main {
       width: 100%;
       max-width: 1100px;
-      padding: 0 32px 48px;
+      padding: 32px 32px 48px;
       position: relative;
       z-index: 1;
     }
@@ -151,6 +151,8 @@
     .badge-visualizado { background: #cff4fc; color: #055160; }
     .badge-pendente { background: #fff3cd; color: #856404; }
 
+    .acoes-wrap { display: flex; flex-direction: column; gap: 4px; }
+    .acoes-linha { display: flex; gap: 4px; }
     .btn-action {
       background: rgba(255,255,255,0.04);
       border: 1px solid #D5D0C3;
@@ -161,7 +163,9 @@
       cursor: pointer;
       text-decoration: none;
       display: inline-block;
-      margin-right: 4px;
+      width: 72px;
+      text-align: center;
+      box-sizing: border-box;
     }
 
     .empty { text-align: center; padding: 40px 0; }
@@ -302,7 +306,7 @@
           <th>Proprietário</th>
           <th>Gerente</th>
           <th>Status</th>
-          <th>Data</th>
+          <th>Data do Preenchimento</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -523,7 +527,7 @@ function renderTabela(status) {
       : f.visualizado_em
         ? `<span class="badge badge-visualizado" title="Aberto em ${_fmtData(f.visualizado_em)}">👁 Visualizado</span>`
         : '<span class="badge badge-pendente">⏳ Pendente</span>';
-    const data = f.preenchido_em ? _fmtData(f.preenchido_em) : _fmtData(f.criado_em);
+    const data = f.status === 'preenchido' ? _fmtData(f.preenchido_em) : '-';
     const alertaFicha = f.status === 'preenchido' && !f.pdf_drive_url
       ? `<span title="PDF da Ficha não foi salvo no Drive" style="color:#f87171;cursor:default;">⚠️</span> ` : '';
     const alertaCnpj = f.status === 'preenchido' && f.cnpj_status && f.cnpj_status.startsWith('❌')
@@ -552,7 +556,10 @@ function renderTabela(status) {
       <td>${esc(f.gerente_nome)}</td>
       <td>${badge}</td>
       <td style="color:#9ca3af">${data}</td>
-      <td>${linkBtn}${pdfBtn}${cnpjBtn}${editBtn}${logBtn}${delBtn}</td>
+      <td><div class="acoes-wrap">
+        <div class="acoes-linha">${linkBtn}${pdfBtn}${cnpjBtn}</div>
+        <div class="acoes-linha">${editBtn}${logBtn}${delBtn}</div>
+      </div></td>
     </tr>`;
   }).join('');
 }
