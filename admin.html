@@ -457,9 +457,35 @@ let buscaAtual = '';
 
 function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+const HUB_AGENTES_URL = 'https://velinn-hub.onrender.com/agentes';
+
+// Sessão do /admin vive em memória no hub — um restart do processo (deploy,
+// reciclagem por inatividade) apaga sessões ativas sem invalidar o cookie no
+// navegador. Qualquer chamada às rotas /api/admin/* nessa situação recebe
+// 403; em vez de deixar a página mostrar um erro genérico, redireciona
+// direto para o login (mesmo destino que já é usado quando não há sessão
+// nenhuma no carregamento inicial).
+async function fetchAdmin(url, opts) {
+  const r = await fetch(url, opts);
+  if (r.status === 403) {
+    window.location.href = HUB_AGENTES_URL;
+    return new Promise(() => {});
+  }
+  return r.json();
+}
+
+async function fetchAdminBlob(url, opts) {
+  const r = await fetch(url, opts);
+  if (r.status === 403) {
+    window.location.href = HUB_AGENTES_URL;
+    return new Promise(() => {});
+  }
+  return r;
+}
+
 async function init() {
-  const me = await fetch('/api/admin/me').then(r => r.json());
-  if (!me.ok) { window.location.href = 'https://velinn-hub.onrender.com/agentes'; return; }
+  const me = await fetchAdmin('/api/admin/me');
+  if (!me.ok) { window.location.href = HUB_AGENTES_URL; return; }
   meData = me;
   nivelAtual = me.nivel;
   document.getElementById('nome-usuario').textContent = me.nome || me.usuario;
@@ -469,7 +495,7 @@ async function init() {
 
 async function carregarFichas() {
   try {
-    const res = await fetch('/api/admin/fichas').then(r => r.json());
+    const res = await fetchAdmin('/api/admin/fichas');
     if (!res.ok) {
       document.getElementById('tbody').innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-text">Sem acesso à listagem</div></div></td></tr>`;
       return;
@@ -536,7 +562,7 @@ function renderTabela(status) {
       ? `<button class="btn-action" onclick="copiarLinkTabela('${SELF_ORIGIN}/cadastro/${f.token}', this)" title="Copiar link">🔗 Link</button>`
       : '';
     const pdfBtn = f.status === 'preenchido' && meData && meData.fichas_pdf
-      ? `<a class="btn-action" href="/api/admin/fichas/${f.token}/pdf" title="Baixar PDF">📄 PDF</a>`
+      ? `<button class="btn-action" onclick="baixarPdf('${f.token}','${esc(f.nome_pousada)}')" title="Baixar PDF">📄 PDF</button>`
       : '';
     const cnpjBtn = f.status === 'preenchido' && f.cnpj && meData && meData.fichas_cnpj
       ? `<button class="btn-action" style="color:#a78bfa" onclick="buscarCnpj('${f.token}')" title="Gerar Cartão CNPJ e QSA no Drive">🔍 CNPJ</button>`
@@ -593,7 +619,7 @@ async function abrirModal() {
     grupo.innerHTML = `<label>Gerente Responsável <span class="req">*</span></label>
       <select id="f-gerente"><option value="">Carregando...</option></select>`;
     try {
-      const gr = await fetch('/api/admin/gerentes').then(r => r.json());
+      const gr = await fetchAdmin('/api/admin/gerentes');
       const s = document.getElementById('f-gerente');
       s.innerHTML = '<option value="">Selecione o gerente...</option>' +
         (gr.data || []).map(g => `<option value="${g.id}" data-nome="${esc(g.nome||g.usuario)}">${esc(g.nome || g.usuario)}</option>`).join('');
@@ -641,7 +667,7 @@ async function gerarLink() {
   btn.textContent = 'Gerando...';
 
   try {
-    const res = await fetch('/api/admin/fichas/gerar', {
+    const res = await fetchAdmin('/api/admin/fichas/gerar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -649,7 +675,7 @@ async function gerarLink() {
         drive_folder_id: drive, gerente_id, gerente_nome,
         num_testemunhas: parseInt(document.getElementById('f-testemunhas').value),
       }),
-    }).then(r => r.json());
+    });
 
     if (res.ok) {
       document.getElementById('link-gerado').textContent = res.link;
@@ -691,7 +717,7 @@ async function _carregarPastas(folderId) {
   const lista = document.getElementById('pasta-lista');
   lista.innerHTML = '<div style="color:#6b7280;padding:20px;text-align:center;font-size:0.85rem;">Carregando...</div>';
   try {
-    const r = await fetch(`/api/admin/drive/pastas?folder_id=${folderId}`).then(r => r.json());
+    const r = await fetchAdmin(`/api/admin/drive/pastas?folder_id=${folderId}`);
     if (!r.ok) { lista.innerHTML = `<div style="color:#f87171;padding:20px;text-align:center;font-size:0.85rem;">Erro: ${r.msg || 'Falha ao carregar'}</div>`; return; }
     _pastaAtualId = r.pasta_id;
     _pastaAtualNome = r.pasta_nome;
@@ -736,12 +762,26 @@ function selecionarPastaAtual() {
   fecharBrowserPasta();
 }
 
-// ── CNPJ, Editar, Log, Excluir (Fase I.4) ───────────────────────────
+// ── CNPJ, Editar, Log, Excluir, PDF (Fase I.4) ──────────────────────
+async function baixarPdf(token, pousada) {
+  try {
+    const r = await fetchAdminBlob(`/api/admin/fichas/${token}/pdf`);
+    if (!r.ok) { toast('Erro ao baixar PDF', true); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Ficha_${(pousada || 'ficha').replace(/\s+/g, '_')}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch { toast('Erro de conexão', true); }
+}
+
 async function buscarCnpj(token) {
   if (!confirm('Gerar Cartão CNPJ e QSA no Drive para esta ficha?')) return;
   toast('Buscando CNPJ...');
   try {
-    const res = await fetch(`/api/admin/fichas/${token}/cnpj`, { method: 'POST' }).then(r => r.json());
+    const res = await fetchAdmin(`/api/admin/fichas/${token}/cnpj`, { method: 'POST' });
     toast(res.msg || (res.ok ? '✅ Gerado com sucesso!' : '❌ Erro'), !res.ok);
   } catch { toast('Erro de conexão', true); }
 }
@@ -807,9 +847,9 @@ async function salvarEdicao() {
   }
   body.testemunhas = testemunhas;
   try {
-    const res = await fetch(`/api/admin/fichas/${_editarToken}/editar`, {
+    const res = await fetchAdmin(`/api/admin/fichas/${_editarToken}/editar`, {
       method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-    }).then(r => r.json());
+    });
     if (res.ok) {
       toast(`Ficha salva como V${res.versao} com sucesso!`);
       fecharEditar();
@@ -826,7 +866,7 @@ async function verLog(token, pousada) {
   document.getElementById('log-lista').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">Carregando...</p>';
   document.getElementById('modal-log').classList.add('open');
   try {
-    const res = await fetch(`/api/admin/fichas/${token}/log`).then(r => r.json());
+    const res = await fetchAdmin(`/api/admin/fichas/${token}/log`);
     const lista = res.logs || [];
     if (!lista.length) {
       document.getElementById('log-lista').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">Nenhuma edição registrada.</p>';
@@ -851,7 +891,7 @@ async function verLog(token, pousada) {
 async function deletarFicha(token, pousada) {
   if (!confirm(`Excluir a ficha de "${pousada}"?\n\nEsta ação é irreversível e remove todos os dados.`)) return;
   try {
-    const res = await fetch(`/api/admin/fichas/${token}`, { method: 'DELETE' }).then(r => r.json());
+    const res = await fetchAdmin(`/api/admin/fichas/${token}`, { method: 'DELETE' });
     if (res.ok) {
       toast('Ficha excluída com sucesso');
       await carregarFichas();
