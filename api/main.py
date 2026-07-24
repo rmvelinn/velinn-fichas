@@ -570,6 +570,10 @@ app = FastAPI(title="VELINN Fichas", lifespan=lifespan)
 BASE = os.path.join(os.path.dirname(__file__), "..")
 
 
+@app.get("/health")
+def health():
+    return JSONResponse({"status": "ok", "ts": datetime.now(timezone.utc).isoformat()})
+
 
 def _cnpj_core(cnpj: str, folder_id: str):
     """Lógica de consulta/upload de CNPJ+QSA compartilhada entre
