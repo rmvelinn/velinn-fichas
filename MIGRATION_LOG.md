@@ -55,7 +55,7 @@
 ### Pendências / achados para validação humana
 
 - Mesma ressalva da I.3: testes rodados só com mocks, sem Supabase/Drive reais.
-- A inconsistência de permissão (PDF/CNPJ checando acesso geral em vez do flag granular) foi **replicada, não corrigida** — se quiser que eu aperte isso para exigir os flags granulares (`fichas_pdf`/`fichas_cnpj`) de verdade, é uma decisão de produto/segurança que prefiro não tomar sozinho.
+- ~~A inconsistência de permissão (PDF/CNPJ checando acesso geral em vez do flag granular) foi **replicada, não corrigida**~~ — **resolvida em correção de segurança separada (pós-I.4)**: `GET /api/admin/fichas/{token}/pdf` e `POST /api/admin/fichas/{token}/cnpj` agora exigem `"fichas_pdf"`/`"fichas_cnpj"` em `agentes`, com bypass só para `nivel=admin` (novo helper `_admin_tem_perm_ou_admin`, decisão explícita do usuário — diferente de `deletar`/`log`/`editar`, que continuam exigindo o flag mesmo para admin, conforme SPEC.md 6.8). Essa correção **não foi replicada no hub** — o hub ainda usa `_tem_acesso_fichas` (acesso geral) nos endpoints equivalentes de `regenerar_cnpj`/`download_pdf`; se quiser paridade, precisa entrar na lista de pendências da sessão do hub (seção I.5 acima).
 
 ---
 
