@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from contextlib import asynccontextmanager
 import os, secrets, requests as req, json, base64, io, html as _html
 from email.message import EmailMessage
@@ -571,26 +571,32 @@ BASE = os.path.join(os.path.dirname(__file__), "..")
 
 
 
-@app.post("/api/interno/cnpj")
-async def interno_cnpj(request: Request):
-    secret = request.headers.get("X-Notif-Secret","")
-    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
-        return JSONResponse({"ok": False}, status_code=403)
-    body = await request.json()
-    cnpj      = body.get("cnpj","")
-    folder_id = body.get("folder_id","")
+def _cnpj_core(cnpj: str, folder_id: str):
+    """Lógica de consulta/upload de CNPJ+QSA compartilhada entre
+    /api/interno/cnpj (X-Notif-Secret, chamado pelo hub) e
+    /api/admin/fichas/{token}/cnpj (sessão local)."""
     dados = _buscar_cnpj(cnpj)
     if not dados:
-        return JSONResponse({"ok": False, "msg": f"CNPJ {cnpj} não encontrado na Receita Federal"})
+        return {"ok": False, "msg": f"CNPJ {cnpj} não encontrado na Receita Federal"}, 200
     try:
         svc = _drive_service_rw()
         pasta_docs       = _drive_get_or_create_folder(svc, folder_id, "Documentos")
         pasta_docs_hotel = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Hotel")
         _drive_upload(pasta_docs_hotel, "CARTÃO CNPJ.pdf", _gerar_pdf_cartao_cnpj(dados))
         _drive_upload(pasta_docs_hotel, "QSA.pdf",         _gerar_pdf_qsa(dados))
-        return JSONResponse({"ok": True, "msg": "✅ Cartão CNPJ e QSA gerados com sucesso"})
+        return {"ok": True, "msg": "✅ Cartão CNPJ e QSA gerados com sucesso"}, 200
     except Exception as e:
-        return JSONResponse({"ok": False, "msg": str(e)})
+        return {"ok": False, "msg": str(e)}, 200
+
+
+@app.post("/api/interno/cnpj")
+async def interno_cnpj(request: Request):
+    secret = request.headers.get("X-Notif-Secret","")
+    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
+        return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    data, status = _cnpj_core(body.get("cnpj", ""), body.get("folder_id", ""))
+    return JSONResponse(data, status_code=status)
 
 
 def _gerar_ficha_core(body: dict, usuario_gerador: str):
@@ -801,6 +807,117 @@ async def admin_gerar_ficha(request: Request):
     payload["gerente_nome"] = gerente_nome
     payload["gerente_email"] = gerente_email
     data, status = _gerar_ficha_core(payload, user.get("usuario", ""))
+    return JSONResponse(data, status_code=status)
+
+
+def _editar_ficha_core(token: str, body: dict):
+    """Lógica de edição com versionamento — Fase I.4. Diferente do hub
+    (que ainda salva a Ficha editada na raiz da pousada), aqui a Ficha
+    reeditada vai para Documentos/Documentos Velinn/, mesma estrutura
+    corrigida na Fase H — não repete o bug antigo."""
+    rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+    if not rows or not isinstance(rows, list):
+        return {"ok": False, "msg": "Ficha não encontrada"}, 404
+    ficha = rows[0]
+    versao_atual = ficha.get("versao") or 1
+    nova_versao = versao_atual + 1
+    campos_editaveis = [
+        "nome_pousada", "razao_social", "nome_fantasia", "cnpj", "email_administrativo",
+        "endereco", "numero", "complemento", "bairro", "cidade", "estado", "cep",
+        "socio_nome", "socio_cpf", "socio_rg", "socio_data_nascimento", "socio_email", "socio_celular",
+        "socio_endereco", "socio_numero", "socio_complemento", "socio_bairro", "socio_cep", "socio_cidade", "socio_estado",
+        "testemunhas",
+    ]
+    update = {k: body[k] for k in campos_editaveis if k in body}
+    update["versao"] = nova_versao
+    ok = db_update("fichas_cadastrais", update, {"token": f"eq.{token}"})
+    if ok:
+        rows2 = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+        if rows2:
+            ficha_atualizada = rows2[0]
+            try:
+                pdf_bytes = _gerar_pdf(ficha_atualizada)
+                nome_pdf = f"Ficha_{ficha_atualizada['nome_pousada'].replace(' ','_')}_V{nova_versao}.pdf"
+                folder_id = ficha_atualizada.get("drive_folder_id", "")
+                if folder_id:
+                    svc = _drive_service_rw()
+                    if svc:
+                        pasta_docs        = _drive_get_or_create_folder(svc, folder_id, "Documentos")
+                        pasta_docs_velinn = _drive_get_or_create_folder(svc, pasta_docs, "Documentos Velinn")
+                        _drive_upload(pasta_docs_velinn, nome_pdf, pdf_bytes)
+            except Exception as e:
+                print(f"[editar_ficha] erro ao gerar/enviar PDF da versão {nova_versao}: {e}")
+    return {"ok": ok, "versao": nova_versao}, (200 if ok else 500)
+
+
+@app.patch("/api/admin/fichas/{token}/editar")
+async def admin_editar_ficha(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_perm(user, "fichas_editar"):
+        return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
+    body = await request.json()
+    data, status = _editar_ficha_core(token, body)
+    if data.get("ok"):
+        _log(user.get("usuario", ""), "editar_ficha", f"token={token[:8]} v{data.get('versao')}")
+    return JSONResponse(data, status_code=status)
+
+
+@app.get("/api/admin/fichas/{token}/log")
+def admin_log_ficha(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_perm(user, "fichas_log"):
+        return JSONResponse({"ok": False}, status_code=403)
+    rows = db_select("logs", {"detalhe": f"like.token={token[:8]}%", "order": "criado_em.desc", "limit": "50"})
+    return JSONResponse({"ok": True, "logs": rows or []})
+
+
+@app.delete("/api/admin/fichas/{token}")
+def admin_deletar_ficha(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_perm(user, "fichas_deletar"):
+        return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
+    ok = db_delete("fichas_cadastrais", {"token": f"eq.{token}"})
+    if ok:
+        _log(user.get("usuario", ""), "deletar_ficha", f"token={token[:8]}")
+    return JSONResponse({"ok": ok})
+
+
+@app.get("/api/admin/fichas/{token}/pdf")
+def admin_download_pdf(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_acesso_fichas(user):
+        return JSONResponse({"ok": False}, status_code=403)
+    rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+    if not rows or not isinstance(rows, list) or rows[0]["status"] != "preenchido":
+        return JSONResponse({"ok": False, "msg": "Ficha não encontrada ou pendente"}, status_code=404)
+    ficha = rows[0]
+    pdf_bytes = _gerar_pdf(ficha)
+    nome = f"Ficha_{ficha['nome_pousada'].replace(' ','_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
+
+
+@app.post("/api/admin/fichas/{token}/cnpj")
+def admin_regenerar_cnpj(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_acesso_fichas(user):
+        return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
+    rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+    if not rows or not isinstance(rows, list):
+        return JSONResponse({"ok": False, "msg": "Ficha não encontrada"}, status_code=404)
+    ficha = rows[0]
+    cnpj = ficha.get("cnpj", "")
+    folder_id = ficha.get("drive_folder_id", "")
+    if not cnpj:
+        return JSONResponse({"ok": False, "msg": "CNPJ não preenchido na ficha"})
+    if not folder_id:
+        return JSONResponse({"ok": False, "msg": "Pasta do Drive não configurada"})
+    data, status = _cnpj_core(cnpj, folder_id)
+    if data.get("ok"):
+        _log(user.get("usuario", ""), "regenerar_cnpj", f"token={token[:8]} cnpj={cnpj}")
     return JSONResponse(data, status_code=status)
 
 

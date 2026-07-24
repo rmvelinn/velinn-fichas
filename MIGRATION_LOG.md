@@ -34,3 +34,28 @@
 
 ---
 
+## Fase I.4 — Editar, log, deletar (+ PDF e CNPJ, interpretação registrada na I.3)
+
+### O que foi implementado
+
+- `PATCH /api/admin/fichas/{token}/editar` — versionamento (`versao++`, novo PDF `_V2`, `_V3`...). **Corrigido em relação ao hub**: o hub ainda salva o PDF de edição direto na raiz da pousada (dívida técnica documentada na Fase H, nunca corrigida lá). Aqui, o PDF da nova versão vai para `Documentos/Documentos Velinn/`, resolvendo `pasta_docs`/`pasta_docs_velinn` via `_drive_get_or_create_folder` — mesmo padrão já validado em produção na Fase H (`_pos_submissao`). Confirmei isso explicitamente no teste 1 (ver abaixo).
+- `GET /api/admin/fichas/{token}/log` — mesmo filtro `like.token={prefix}%` já usado pelo hub.
+- `DELETE /api/admin/fichas/{token}` — com log no formato `token={prefix}` (já corrigido desde a Fase 1B).
+- `GET /api/admin/fichas/{token}/pdf` — download de PDF (interpretação minha, registrada na I.3: não estava em nenhuma fase explícita, mas faz parte do mesmo grupo de "botões de ação por ficha").
+- `POST /api/admin/fichas/{token}/cnpj` — regeneração de CNPJ/QSA autenticada por sessão (mesma interpretação). Extraí `_cnpj_core(cnpj, folder_id)` de `/api/interno/cnpj` para reaproveitar a lógica sem duplicar código, igual fiz com `_gerar_ficha_core` na I.3.
+- **Permissões replicadas fielmente do hub, inclusive uma inconsistência que já existia lá**: `download_pdf` e `regenerar_cnpj` no hub checam só `_tem_acesso_fichas` (acesso geral), não os flags granulares `fichas_pdf`/`fichas_cnpj` — mesmo o frontend condicionando a exibição dos botões a esses flags. Repliquei esse comportamento exatamente como está (`_admin_tem_acesso_fichas` nos dois), para não mudar comportamento de acesso durante uma migração. Não é uma correção que me pediram, então não a fiz por conta própria — só registro que a inconsistência existe e sobrevive na migração.
+- `admin.html`: modais de Editar e Log (réplica funcional dos modais do hub), botões PDF/CNPJ/Editar/Log/Excluir na tabela, todos condicionados aos flags corretos vindos de `/api/admin/me`.
+
+### 3 cenários testados
+
+1. **Sucesso** — edição de ficha: nova versão (`v1→v2`) confirmada, e o PDF da nova versão foi parar em `Documentos Velinn` (pasta `velinn_id`), **não** na raiz (`root_id`) nem em `Documentos Hotel` — validação direta do requisito mais crítico desta fase. ✅
+2. **Erro/permissão negada** — usuário sem `fichas_deletar` bloqueado em `DELETE`; usuário sem `fichas_log` bloqueado em `GET .../log`. ✅
+3. **Borda específica da fase** — tentativa de baixar PDF de uma ficha com `status="pendente"` → 404 (só fichas preenchidas podem gerar PDF, evita gerar PDF de dados vazios/incompletos). ✅
+
+### Pendências / achados para validação humana
+
+- Mesma ressalva da I.3: testes rodados só com mocks, sem Supabase/Drive reais.
+- A inconsistência de permissão (PDF/CNPJ checando acesso geral em vez do flag granular) foi **replicada, não corrigida** — se quiser que eu aperte isso para exigir os flags granulares (`fichas_pdf`/`fichas_cnpj`) de verdade, é uma decisão de produto/segurança que prefiro não tomar sozinho.
+
+---
+

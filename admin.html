@@ -270,8 +270,6 @@
 
   <div class="aviso">
     Esta página está em migração do painel interno para o velinn-fichas (Fase I).
-    Editar, ver log e excluir ainda não estão disponíveis aqui — chegam na
-    próxima fase.
   </div>
 
   <div class="stats">
@@ -383,6 +381,57 @@
   </div>
 </div>
 
+<!-- Modal: Editar Ficha -->
+<div class="modal-overlay" id="modal-editar">
+  <div class="modal-box" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+    <h2>Editar Ficha <span id="editar-versao-label" style="font-size:0.8rem;color:#b48c50;"></span></h2>
+    <div style="margin-bottom:16px;color:#f87171;font-size:0.8rem;">⚠️ Cria nova versão no Drive — original preservado.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="form-group" style="grid-column:1/-1"><label>Nome da Pousada</label><input id="e-nome_pousada" type="text" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Razão Social</label><input id="e-razao_social" type="text" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Nome Fantasia</label><input id="e-nome_fantasia" type="text" /></div>
+      <div class="form-group"><label>CNPJ</label><input id="e-cnpj" type="text" /></div>
+      <div class="form-group"><label>E-mail Administrativo</label><input id="e-email_administrativo" type="text" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Endereço</label><input id="e-endereco" type="text" /></div>
+      <div class="form-group"><label>Número</label><input id="e-numero" type="text" /></div>
+      <div class="form-group"><label>Complemento</label><input id="e-complemento" type="text" /></div>
+      <div class="form-group"><label>Bairro</label><input id="e-bairro" type="text" /></div>
+      <div class="form-group"><label>Cidade</label><input id="e-cidade" type="text" /></div>
+      <div class="form-group"><label>Estado</label><input id="e-estado" type="text" /></div>
+      <div class="form-group"><label>CEP</label><input id="e-cep" type="text" /></div>
+
+      <div style="grid-column:1/-1;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;font-weight:600;color:#b48c50;font-size:0.85rem;">Sócio / Proprietário</div>
+      <div class="form-group"><label>Nome</label><input id="e-socio_nome" type="text" /></div>
+      <div class="form-group"><label>CPF</label><input id="e-socio_cpf" type="text" /></div>
+      <div class="form-group"><label>RG</label><input id="e-socio_rg" type="text" /></div>
+      <div class="form-group"><label>Data de Nascimento</label><input id="e-socio_data_nascimento" type="text" /></div>
+      <div class="form-group"><label>E-mail</label><input id="e-socio_email" type="text" /></div>
+      <div class="form-group"><label>Celular</label><input id="e-socio_celular" type="text" /></div>
+      <div class="form-group" style="grid-column:1/-1"><label>End. Residencial</label><input id="e-socio_endereco" type="text" /></div>
+      <div class="form-group"><label>Número Res.</label><input id="e-socio_numero" type="text" /></div>
+      <div class="form-group"><label>Complemento Res.</label><input id="e-socio_complemento" type="text" /></div>
+
+      <div id="e-testemunhas-wrap" style="grid-column:1/-1;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancelar" onclick="fecharEditar()">Cancelar</button>
+      <button class="btn-gerar" id="btn-salvar-edicao" onclick="salvarEdicao()">Salvar Nova Versão</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Log de Edições -->
+<div class="modal-overlay" id="modal-log">
+  <div class="modal-box" style="max-width:560px;max-height:80vh;overflow-y:auto;">
+    <h2>📋 Histórico de Edições</h2>
+    <div id="modal-log-pousada" style="font-size:0.85rem;color:#9ca3af;margin-top:-12px;margin-bottom:16px;"></div>
+    <div id="log-lista" style="min-height:80px"></div>
+    <div class="modal-actions">
+      <button class="btn-cancelar" onclick="document.getElementById('modal-log').classList.remove('open')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -458,13 +507,28 @@ function renderTabela(status) {
     const linkBtn = meData && meData.fichas_link
       ? `<button class="btn-action" onclick="copiarLinkTabela('${SELF_ORIGIN}/cadastro/${f.token}', this)" title="Copiar link">🔗 Link</button>`
       : '';
+    const pdfBtn = f.status === 'preenchido' && meData && meData.fichas_pdf
+      ? `<a class="btn-action" href="/api/admin/fichas/${f.token}/pdf" title="Baixar PDF">📄 PDF</a>`
+      : '';
+    const cnpjBtn = f.status === 'preenchido' && f.cnpj && meData && meData.fichas_cnpj
+      ? `<button class="btn-action" style="color:#a78bfa;border-color:rgba(167,139,250,0.2)" onclick="buscarCnpj('${f.token}')" title="Gerar Cartão CNPJ e QSA no Drive">🔍 CNPJ</button>`
+      : '';
+    const editBtn = f.status === 'preenchido' && meData && meData.fichas_editar
+      ? `<button class="btn-action" style="color:#fbbf24;border-color:rgba(251,191,36,0.2)" onclick="abrirEditar('${f.token}')" title="Editar ficha">✏️ Editar</button>`
+      : '';
+    const logBtn = f.status === 'preenchido' && meData && meData.fichas_log
+      ? `<button class="btn-action" style="color:#34d399;border-color:rgba(52,211,153,0.2)" onclick="verLog('${f.token}', '${esc(f.nome_pousada)}')" title="Ver histórico de edições">📋 Log</button>`
+      : '';
+    const delBtn = meData && meData.fichas_deletar
+      ? `<button class="btn-action" style="color:#f87171;border-color:rgba(248,113,113,0.2)" onclick="deletarFicha('${f.token}', '${esc(f.nome_pousada)}')" title="Excluir ficha">🗑️ Excluir</button>`
+      : '';
     return `<tr>
       <td>${esc(f.nome_pousada)}</td>
       <td>${esc(f.nome_proprietario)}</td>
       <td>${esc(f.gerente_nome)}</td>
       <td>${badge}</td>
       <td style="color:#9ca3af">${data}</td>
-      <td>${linkBtn}</td>
+      <td>${linkBtn}${pdfBtn}${cnpjBtn}${editBtn}${logBtn}${delBtn}</td>
     </tr>`;
   }).join('');
 }
@@ -639,6 +703,131 @@ function selecionarPastaAtual() {
   inp.dataset.folderId = _pastaAtualId;
   inp.style.color = '#e8e0d0';
   fecharBrowserPasta();
+}
+
+// ── CNPJ, Editar, Log, Excluir (Fase I.4) ───────────────────────────
+async function buscarCnpj(token) {
+  if (!confirm('Gerar Cartão CNPJ e QSA no Drive para esta ficha?')) return;
+  toast('Buscando CNPJ...');
+  try {
+    const res = await fetch(`/api/admin/fichas/${token}/cnpj`, { method: 'POST' }).then(r => r.json());
+    toast(res.msg || (res.ok ? '✅ Gerado com sucesso!' : '❌ Erro'), !res.ok);
+  } catch { toast('Erro de conexão', true); }
+}
+
+let _editarToken = null;
+
+function abrirEditar(token) {
+  const rows = todasFichas.filter(f => f.token === token);
+  if (!rows.length) return;
+  const f = rows[0];
+  _editarToken = token;
+  const versao = f.versao || 1;
+  document.getElementById('editar-versao-label').textContent = `(V${versao} → salvará V${versao+1})`;
+  const campos = [
+    'nome_pousada','razao_social','nome_fantasia','cnpj','email_administrativo',
+    'endereco','numero','complemento','bairro','cidade','estado','cep',
+    'socio_nome','socio_cpf','socio_rg','socio_data_nascimento','socio_email','socio_celular',
+    'socio_endereco','socio_numero','socio_complemento'
+  ];
+  campos.forEach(c => { const el = document.getElementById('e-'+c); if (el) el.value = f[c] || ''; });
+  const testemunhas = f.testemunhas || [];
+  const wrap = document.getElementById('e-testemunhas-wrap');
+  wrap.innerHTML = '';
+  testemunhas.forEach((t, i) => {
+    wrap.innerHTML += `
+      <div style="grid-column:1/-1;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;font-weight:600;color:#b48c50;font-size:0.85rem;">Testemunha ${i+1}</div>
+      <div class="form-group"><label>Nome</label><input id="et-${i}-nome" type="text" value="${esc(t.nome||'')}" /></div>
+      <div class="form-group"><label>CPF</label><input id="et-${i}-cpf" type="text" value="${esc(t.cpf||'')}" /></div>
+      <div class="form-group"><label>RG</label><input id="et-${i}-rg" type="text" value="${esc(t.rg||'')}" /></div>
+      <div class="form-group"><label>E-mail</label><input id="et-${i}-email" type="text" value="${esc(t.email||'')}" /></div>
+    `;
+  });
+  document.getElementById('modal-editar').classList.add('open');
+}
+
+function fecharEditar() {
+  _editarToken = null;
+  document.getElementById('modal-editar').classList.remove('open');
+}
+
+async function salvarEdicao() {
+  if (!_editarToken) return;
+  const btn = document.getElementById('btn-salvar-edicao');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const campos = [
+    'razao_social','nome_fantasia','cnpj','email_administrativo',
+    'endereco','numero','complemento','bairro','cidade','estado','cep',
+    'socio_nome','socio_cpf','socio_rg','socio_data_nascimento','socio_email','socio_celular',
+    'socio_endereco','socio_numero','socio_complemento'
+  ];
+  const body = {};
+  campos.forEach(c => { const el = document.getElementById('e-'+c); if (el) body[c] = el.value; });
+  const testemunhas = [];
+  let i = 0;
+  while (document.getElementById(`et-${i}-nome`)) {
+    testemunhas.push({
+      nome:  document.getElementById(`et-${i}-nome`).value,
+      cpf:   document.getElementById(`et-${i}-cpf`).value,
+      rg:    document.getElementById(`et-${i}-rg`).value,
+      email: document.getElementById(`et-${i}-email`).value,
+    });
+    i++;
+  }
+  body.testemunhas = testemunhas;
+  try {
+    const res = await fetch(`/api/admin/fichas/${_editarToken}/editar`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    }).then(r => r.json());
+    if (res.ok) {
+      toast(`Ficha salva como V${res.versao} com sucesso!`);
+      fecharEditar();
+      await carregarFichas();
+    } else {
+      toast(res.msg || 'Erro ao salvar', true);
+    }
+  } catch { toast('Erro de conexão', true); }
+  btn.disabled = false; btn.textContent = 'Salvar Nova Versão';
+}
+
+async function verLog(token, pousada) {
+  document.getElementById('modal-log-pousada').textContent = pousada;
+  document.getElementById('log-lista').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">Carregando...</p>';
+  document.getElementById('modal-log').classList.add('open');
+  try {
+    const res = await fetch(`/api/admin/fichas/${token}/log`).then(r => r.json());
+    const lista = res.logs || [];
+    if (!lista.length) {
+      document.getElementById('log-lista').innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px">Nenhuma edição registrada.</p>';
+      return;
+    }
+    document.getElementById('log-lista').innerHTML = lista.map(l => {
+      const dt = l.criado_em ? new Date(l.criado_em).toLocaleString('pt-BR') : '—';
+      const versao = l.detalhe?.match(/v(\d+)/)?.[1];
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.07);">
+        <div>
+          <div style="font-size:0.85rem;color:#e8e0d0;font-weight:600">${versao ? '✏️ Versão ' + versao + ' gerada' : l.acao}</div>
+          <div style="font-size:0.75rem;color:#6b7280;margin-top:2px">por <strong style="color:#9ca3af">${esc(l.usuario)}</strong></div>
+        </div>
+        <div style="font-size:0.75rem;color:#6b7280;white-space:nowrap;margin-left:16px">${dt}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('log-lista').innerHTML = '<p style="color:#f87171;text-align:center;padding:20px">Erro ao carregar logs.</p>';
+  }
+}
+
+async function deletarFicha(token, pousada) {
+  if (!confirm(`Excluir a ficha de "${pousada}"?\n\nEsta ação é irreversível e remove todos os dados.`)) return;
+  try {
+    const res = await fetch(`/api/admin/fichas/${token}`, { method: 'DELETE' }).then(r => r.json());
+    if (res.ok) {
+      toast('Ficha excluída com sucesso');
+      await carregarFichas();
+    } else {
+      toast(res.msg || 'Erro ao excluir', true);
+    }
+  } catch { toast('Erro de conexão', true); }
 }
 
 function toast(msg, err = false) {
