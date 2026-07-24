@@ -24,6 +24,7 @@ EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "marcelo.brandao@velinn.com")
 GMAIL_SA_JSON = os.environ.get("GMAIL_SA_JSON", "")
 DRIVE_SA_JSON = os.environ.get("DRIVE_SA_JSON", GMAIL_SA_JSON)
 HUB_URL       = os.environ.get("HUB_URL",  "https://velinn-hub.onrender.com")
+SELF_URL      = os.environ.get("SELF_URL", "https://velinn-fichas.onrender.com")
 NOTIF_EMAILS        = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
 FICHAS_NOTIF_SECRET = os.environ.get("FICHAS_NOTIF_SECRET", "")
 
@@ -58,6 +59,20 @@ def db_update(table, data, params):
     if content_range.endswith("/0"):
         return False
     return True
+
+
+def db_insert(table, data):
+    r = req.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=_headers(), json=data)
+    if not r.ok:
+        print(f"[db_insert] erro {r.status_code} em {table}: {r.text[:200]}")
+    return r.ok
+
+
+def _log(usuario: str, acao: str, detalhe: str = "", ip: str = ""):
+    try:
+        db_insert("logs", {"usuario": usuario, "acao": acao, "detalhe": detalhe, "ip": ip})
+    except:
+        pass
 
 
 def _gmail_token():
@@ -516,6 +531,48 @@ async def interno_cnpj(request: Request):
         return JSONResponse({"ok": False, "msg": str(e)})
 
 
+@app.post("/api/interno/gerar-ficha")
+async def interno_gerar_ficha(request: Request):
+    secret = request.headers.get("X-Notif-Secret", "")
+    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
+        return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    nome_pousada       = body.get("nome_pousada", "").strip()
+    nome_prop          = body.get("nome_proprietario", "").strip()
+    email_prop         = body.get("email_proprietario", "").strip()
+    drive_folder       = body.get("drive_folder_id", "").strip()
+    gerente_id         = body.get("gerente_id", "").strip()
+    gerente_nome       = body.get("gerente_nome", "").strip()
+    gerente_email      = body.get("gerente_email", "").strip()
+    usuario_gerador    = body.get("usuario", "").strip()
+    if not nome_pousada or not nome_prop or not email_prop:
+        return JSONResponse({"ok": False, "msg": "Preencha todos os campos obrigatórios"}, status_code=400)
+    if not gerente_id:
+        return JSONResponse({"ok": False, "msg": "Selecione o gerente responsável"}, status_code=400)
+
+    token = secrets.token_urlsafe(24)
+    num_testemunhas = int(body.get("num_testemunhas", 1))
+    num_testemunhas = max(0, min(5, num_testemunhas))
+    ok = db_insert("fichas_cadastrais", {
+        "token":              token,
+        "gerente_id":         gerente_id,
+        "gerente_nome":       gerente_nome,
+        "gerente_email":      gerente_email,
+        "nome_pousada":       nome_pousada,
+        "nome_proprietario":  nome_prop,
+        "email_proprietario": email_prop,
+        "drive_folder_id":    drive_folder,
+        "num_testemunhas":    num_testemunhas,
+        "status":             "pendente",
+    })
+    if not ok:
+        return JSONResponse({"ok": False, "msg": "Erro ao salvar no banco"}, status_code=500)
+    link = f"{SELF_URL}/cadastro/{token}"
+    _log(usuario_gerador, "gerar_ficha", f"token={token[:8]} {nome_pousada} / {email_prop}")
+    _enviar_email_link_cliente(email_prop, nome_prop, nome_pousada, link, gerente_nome)
+    return JSONResponse({"ok": True, "link": link, "token": token})
+
+
 @app.get("/logo")
 def logo():
     return FileResponse(os.path.join(BASE, "logo.png"), media_type="image/png")
@@ -665,6 +722,52 @@ def _pos_submissao(ficha: dict):
     _enviar_email_agradecimento(ficha)
     _enviar_email_notificacao(ficha, pdf_url, cnpj_status)
     print(f"[pos_submissao] concluído")
+
+
+def _enviar_email_link_cliente(email: str, nome: str, pousada: str, link: str, gerente: str):
+    assunto = f"Ficha Cadastral VELINN — {pousada}"
+    plain = f"""Olá, {nome}!
+
+{gerente}, do time VELINN, gerou um link especial para você preencher a ficha cadastral da {pousada}.
+
+Acesse o link abaixo para preencher:
+{link}
+
+O preenchimento leva menos de 5 minutos.
+
+VELINN Hotels
+"""
+    html = f"""
+<div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
+  <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
+    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:40px;" />
+    <p style="color:#b48c50;font-size:15px;font-weight:600;margin:10px 0 0;letter-spacing:0.5px;">Ficha Cadastral</p>
+  </div>
+  <div style="padding:32px;">
+    <p style="font-size:16px;color:#222;">Olá, <strong>{nome}</strong>!</p>
+    <p style="color:#555;line-height:1.6;">
+      O time VELINN gerou um link personalizado para você preencher
+      a ficha cadastral de <strong>{pousada}</strong>.
+    </p>
+    <p style="color:#555;line-height:1.6;">
+      O preenchimento é simples, rápido e seguro.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="{link}" style="background:#b48c50;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;">
+        Preencher Ficha Cadastral →
+      </a>
+    </div>
+    <p style="color:#999;font-size:12px;">
+      Se o botão não funcionar, copie e cole este link no seu navegador:<br>
+      <a href="{link}" style="color:#b48c50;">{link}</a>
+    </p>
+  </div>
+  <div style="background:#0d1117;padding:16px;text-align:center;border-top:3px solid #b48c50;">
+    <p style="color:#888;font-size:11px;margin:0;">VELINN Hotel</p>
+  </div>
+</div>
+"""
+    _enviar_email(email, assunto, plain, html)
 
 
 def _enviar_email_agradecimento(ficha: dict):
