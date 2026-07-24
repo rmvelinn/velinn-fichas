@@ -19,18 +19,24 @@
 
     header {
       width: 100%;
-      max-width: 1100px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 28px 32px;
+      justify-content: center;
       position: relative;
       z-index: 1;
       background: #0d1117;
       border-bottom: 3px solid #b48c50;
     }
 
-    .logo { height: 40px; }
+    .header-inner {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 32px;
+    }
+
+    .logo { height: 50px; }
     .user-badge { color: #6b7280; font-size: 0.82rem; }
     .user-badge span { color: #b48c50; font-weight: 600; }
 
@@ -66,7 +72,7 @@
 
     .btn-novo {
       background: #b48c50;
-      color: #0d1117;
+      color: #ffffff;
       border: none;
       border-radius: 8px;
       padding: 12px 24px;
@@ -85,6 +91,7 @@
       border-radius: 8px;
       padding: 16px;
       min-width: 110px;
+      flex: 1;
       text-align: center;
     }
     .stat-box .n { color: #b48c50; font-size: 28px; font-weight: 700; }
@@ -102,6 +109,20 @@
       transition: 0.15s;
     }
     .filter-btn.active { background: #FBF3E4; border-color: #b48c50; color: #b48c50; }
+
+    .busca-input {
+      background: #ffffff;
+      border: 1px solid #d4c8b0;
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: #333;
+      outline: none;
+      flex: 1;
+      min-width: 160px;
+    }
+    .busca-input:focus { border-color: #b48c50; }
 
     .table-wrap { background: #fff; border: 1px solid #e0d0b0; border-radius: 8px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; }
@@ -239,11 +260,13 @@
 <body>
 
 <header>
-  <img class="logo" src="/static/logo.png" alt="VELINN" />
-  <div class="header-links">
-    <span class="user-badge">Olá, <span id="nome-usuario">…</span></span>
-    <a href="https://velinn-hub.onrender.com/agentes" class="btn-back">← Hub</a>
-    <a href="/admin/logout" class="sair">Sair</a>
+  <div class="header-inner">
+    <img class="logo" src="/static/logo.png" alt="VELINN" />
+    <div class="header-links">
+      <span class="user-badge">Olá, <span id="nome-usuario">…</span></span>
+      <a href="https://velinn-hub.onrender.com/agentes" class="btn-back">← Hub</a>
+      <a href="/admin/logout" class="sair">Sair</a>
+    </div>
   </div>
 </header>
 
@@ -264,6 +287,7 @@
   </div>
 
   <div class="filtros">
+    <input type="search" id="busca-input" class="busca-input" placeholder="Buscar hotel/pousada..." oninput="buscar(this.value)" />
     <button class="filter-btn active" onclick="filtrar('todos', this)">Todos</button>
     <button class="filter-btn" onclick="filtrar('preenchido', this)">Preenchidos</button>
     <button class="filter-btn" onclick="filtrar('visualizado', this)">Visualizados</button>
@@ -425,6 +449,7 @@ let meData = null;
 let nivelAtual = '';
 let todasFichas = [];
 let filtroAtual = 'todos';
+let buscaAtual = '';
 
 function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -467,6 +492,11 @@ function filtrar(status, btn) {
   renderTabela(status);
 }
 
+function buscar(valor) {
+  buscaAtual = valor;
+  renderTabela(filtroAtual);
+}
+
 function _fmtData(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -478,6 +508,10 @@ function renderTabela(status) {
             : status === 'visualizado' ? todasFichas.filter(f => f.visualizado_em && f.status !== 'preenchido')
             : status === 'pendente'    ? todasFichas.filter(f => !f.visualizado_em && f.status !== 'preenchido')
             : todasFichas.filter(f => f.status === status);
+  if (buscaAtual.trim()) {
+    const termo = buscaAtual.trim().toLowerCase();
+    dados = dados.filter(f => (f.nome_pousada || '').toLowerCase().includes(termo));
+  }
   const tbody = document.getElementById('tbody');
   if (!dados.length) {
     tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nenhuma ficha encontrada</div></div></td></tr>`;
@@ -501,16 +535,16 @@ function renderTabela(status) {
       ? `<a class="btn-action" href="/api/admin/fichas/${f.token}/pdf" title="Baixar PDF">📄 PDF</a>`
       : '';
     const cnpjBtn = f.status === 'preenchido' && f.cnpj && meData && meData.fichas_cnpj
-      ? `<button class="btn-action" style="color:#a78bfa;border-color:rgba(167,139,250,0.2)" onclick="buscarCnpj('${f.token}')" title="Gerar Cartão CNPJ e QSA no Drive">🔍 CNPJ</button>`
+      ? `<button class="btn-action" style="color:#a78bfa" onclick="buscarCnpj('${f.token}')" title="Gerar Cartão CNPJ e QSA no Drive">🔍 CNPJ</button>`
       : '';
     const editBtn = f.status === 'preenchido' && meData && meData.fichas_editar
-      ? `<button class="btn-action" style="color:#fbbf24;border-color:rgba(251,191,36,0.2)" onclick="abrirEditar('${f.token}')" title="Editar ficha">✏️ Editar</button>`
+      ? `<button class="btn-action" style="color:#fbbf24" onclick="abrirEditar('${f.token}')" title="Editar ficha">✏️ Editar</button>`
       : '';
     const logBtn = f.status === 'preenchido' && meData && meData.fichas_log
-      ? `<button class="btn-action" style="color:#34d399;border-color:rgba(52,211,153,0.2)" onclick="verLog('${f.token}', '${esc(f.nome_pousada)}')" title="Ver histórico de edições">📋 Log</button>`
+      ? `<button class="btn-action" style="color:#34d399" onclick="verLog('${f.token}', '${esc(f.nome_pousada)}')" title="Ver histórico de edições">📋 Log</button>`
       : '';
     const delBtn = meData && meData.fichas_deletar
-      ? `<button class="btn-action" style="color:#f87171;border-color:rgba(248,113,113,0.2)" onclick="deletarFicha('${f.token}', '${esc(f.nome_pousada)}')" title="Excluir ficha">🗑️ Excluir</button>`
+      ? `<button class="btn-action" style="background:#f87171;color:#ffffff;border-color:#f87171" onclick="deletarFicha('${f.token}', '${esc(f.nome_pousada)}')" title="Excluir ficha">🗑️ Excluir</button>`
       : '';
     return `<tr>
       <td>${alertaFicha}${alertaCnpj}${esc(f.nome_pousada)}</td>
