@@ -27,9 +27,11 @@ domain-wide delegation na mesma peça.
 **Escopo do sistema:** dois apps que compartilham banco (Supabase) e um
 segredo de comunicação interno:
 - `velinn-fichas` — formulário público voltado ao parceiro (sem autenticação de
-  usuário; o token do link é a credencial)
-- módulo "fichas" dentro de `velinn-hub` — painel interno onde o gerente gera o
-  link, acompanha status, edita, e vê log de alterações
+  usuário; o token do link é a credencial), **e também** o painel de gestão
+  completo (`/admin`), desde a migração da Fase I (ver seção 12)
+- `velinn-hub` — desde a Fase I, atua apenas como SSO/portaria para o fichas:
+  autentica o gerente e faz o handoff de sessão (mesmo mecanismo já usado
+  pelo `velinn-metas`); não contém mais nenhuma lógica de negócio de fichas
 
 ---
 
@@ -296,16 +298,17 @@ prioridade imediata):**
 
 | Fase | Entregável | Status |
 |------|-----------|--------|
-| A | Resolver cold start — decidir Render paid ($7/mês) vs. Railway | ⏳ Standby — decisão de negócio pendente |
+| A | Resolver cold start via keepalive (replicar mecanismo já usado no `velinn-checklist`) | ✅ Concluída e validada em produção em 2026-07-24 (commit `a2b7441`, endpoint `/health`; linha adicionada na crontab do Oracle pelo usuário via SSH, `*/13 * * * *`, confirmada rodando com sucesso) |
 | B | Contrato V2.0 (DOCX pré-preenchido a partir de template Word, salvo em `Documentos/Documentos Velinn/`) | ⏳ Standby — depende de template Word ainda não entregue |
-| C | Integração ClickUp (link gerado → status "Ficha Enviada"; preenchido → "Ficha Preenchida" + task de contrato) | ⏳ Standby — depende de plataforma ClickUp estar pronta; dados necessários: API Key, List ID, nomes exatos dos status |
-| D | Retry em falhas de Drive/e-mail (hoje: falha silenciosa, parceiro recebe "sucesso" mesmo se upload/envio falhar) | ⏳ Standby — sem prioridade definida ainda, mas é dívida técnica de risco médio |
-| E | Migração de infra (VPS próprio, `wikivelinn.com.br`, subdomínios `fichas.`/`hub.`, SSO via cookie compartilhado) | ⏳ Standby — planejada para depois da migração do WikiVelinn |
-| F | `supabase_hub.sql` — documentar schema das tabelas do hub (`usuarios`, `logs`, `sessoes`, `quadros`) | ⏳ Baixa prioridade |
-| G | Otimizar `_drive_upload` (recria cliente Drive 3–4× por submissão) | ⏳ Baixa prioridade — performance, não bug |
+| C | Integração ClickUp (link gerado → status "Ficha Enviada"; preenchido → "Ficha Preenchida" + task de contrato) | ⏳ Standby — depende de plataforma ClickUp estar pronta; dados necessários: API Key, List ID, nomes exatos dos status. Registrada como task no ClickUp pessoal do usuário (subtarefa de "Projeto Ficha de Cadastro") |
+| D | Visibilidade de falha de upload no e-mail de notificação e no painel `/admin` (escopo reduzido do "retry" original — não é retry automático, é só visibilidade) | ✅ Concluída e validada em produção em 2026-07-24 (commit `95ec82c`): coluna `cnpj_status` nova em `fichas_cadastrais`, mensagem de e-mail com motivo específico da falha, link do painel corrigido para `{SELF_URL}/admin`, ícones de alerta (⚠️) no `/admin` para Ficha e CNPJ/QSA. `ALTER TABLE` rodado pelo usuário. Teste real confirmado: submissão completa gravou `cnpj_status` corretamente |
+| E | ~~Migração de infra (VPS próprio, domínio wikivelinn.com.br)~~ | ❌ Eliminada do roadmap em 2026-07-24, decisão do usuário |
+| F | `supabase_hub.sql` — documentar schema das tabelas do hub (`usuarios`, `logs`, `sessoes`, `quadros`, `fichas_cadastrais`) | ✅ Concluída em 2026-07-24 (commit `98c3892`). Achado relevante durante a investigação: coluna `num_testemunhas` ainda tinha `DEFAULT 1` no banco (divergente da correção de default já feita no código da aplicação) — corrigido junto via `ALTER TABLE ... SET DEFAULT 0`, rodado pelo usuário. Documentação inclui nota sobre a família de tabelas do `checklist` para referência futura |
+| G | Otimizar `_drive_upload` (recria cliente Drive a cada chamada — 6 pontos de chamada em 3 funções: `_pos_submissao`, `_cnpj_core`, `_editar_ficha_core`) | ✅ Concluída e validada em produção em 2026-07-24 (commit `70d5c6f`). `_drive_upload` passou a receber `svc` como parâmetro em vez de construir seu próprio cliente — `_drive_service_rw()` chamado 1x por função em vez de 1x adicional por upload |
 | H | Fase H — PDF da Ficha (principal) vai para a pasta raiz da pousada desde a primeira submissão (nunca esteve em `Documentos/Documentos Hotel/`, diferente de CNPJ/QSA que sempre foram salvos lá corretamente). Aguardando confirmação com a diretoria: manter a raiz como padrão oficial (e corrigir o SPEC.md, não o código) ou migrar para dentro da subpasta (código + reorganização do histórico no Drive) | ✅ Decisão da diretoria: 3ª forma — Ficha vai para `Documentos/Documentos Velinn/`, CNPJ/QSA continuam em `Documentos/Documentos Hotel/`. Sem reorganização de fichas antigas (resolvido manualmente antes). **Concluída e validada em produção em 2026-07-23** (commit `a4e881c`, push feito) — ver seção 10 para o histórico do bug encontrado na primeira tentativa (`9fae016`) e a correção aplicada. Ainda pendente: mesma mudança no fluxo de edição do `velinn-hub` (sessão separada) |
 
-| I | **Migração arquitetural — remover 100% da lógica de negócio de fichas do `velinn-hub`.** Hub passa a ser só SSO/permissões (`_tem_acesso_fichas`, `_tem_perm` continuam ali); geração de link, listagem, edição e log passam a viver inteiramente em `velinn-fichas`, com o hub apenas consumindo a API dele. Decidido em 2026-07-23: com só 3 fichas reais geradas até agora, o custo de migrar nunca será menor do que é hoje — motivo principal do timing. Planejada para execução em sessão dedicada (fase a fase, com SPEC.md de migração próprio), não durante o dia da decisão | 🔄 Em andamento — ver seção 12 para detalhamento das sub-fases (I.1a a I.6) |
+| I | **Migração arquitetural — remover 100% da lógica de negócio de fichas do `velinn-hub`.** Hub passa a ser só SSO/permissões (`_tem_acesso_fichas`, `_tem_perm` continuam ali); geração de link, listagem, edição e log passam a viver inteiramente em `velinn-fichas`, com o hub apenas consumindo a API dele. Decidido em 2026-07-23: com só 3 fichas reais geradas até agora, o custo de migrar nunca será menor do que é hoje — motivo principal do timing. | ✅ **Completa** — todas as sub-fases (I.1a a I.6) concluídas e validadas em produção. Ver seção 12 para detalhamento |
+| J | Redesign visual do painel `/admin` — paleta/estilo de cor inspirado no painel do `velinn-checklist` (fundo creme, cabeçalho de tabela navy, cards brancos, badges coloridos), mantendo botões de ação no estilo original a pedido do usuário; ajustes de header full-width, espaçamento, tamanho uniforme de botões, coluna "Data do Preenchimento" | ✅ Concluída e validada em produção em 2026-07-24 (commits `54c9868`, `c7d64fc`, `4e3cec6`). Logo também atualizado pelo usuário diretamente no `static/logo.png` |
 
 **Regra do framework aplicável:** nenhuma dessas fases entra em execução sem
 você abrir explicitamente com "Vamos executar a Fase [X]" e o plano ser
@@ -431,7 +434,7 @@ Sub-fases:
 | I.2 | Handshake SSO + página `/admin` em `velinn-fichas` (só "Gerar Link" visível, sem ligar ao backend ainda) | ✅ Concluída e validada em produção em 2026-07-24 (commit `d534969`) |
 | I.3 | Listagem, navegador de pastas do Drive, dropdown de gerentes, "Gerar Link" ligado de verdade | ✅ Concluída e validada em produção em 2026-07-24 (commit `3594366`) |
 | I.4 | Editar (com estrutura de pastas correta, Fase H), log, deletar, PDF, CNPJ | ✅ Concluída e validada em produção em 2026-07-24 (commit `3733c2b`) |
-| I.5 | Limpeza do `velinn-hub` (rotas redundantes, código órfão) + troca da URL do card "Fichas" na tabela `quadros` | 🔄 Troca de URL **concluída e validada** em 2026-07-24 pelo usuário diretamente no Supabase (card "Fichas" agora aponta para `https://velinn-fichas.onrender.com/admin`) — limpeza de código órfão no hub ainda pendente, agora liberada com segurança já que ninguém mais usa o caminho antigo |
+| I.5 | Limpeza do `velinn-hub` (rotas redundantes, código órfão) + troca da URL do card "Fichas" na tabela `quadros` | ✅ Concluída em 2026-07-24. Troca de URL validada em produção pelo usuário. Limpeza de código (commit `6f8223a`, `velinn-hub`): 10 rotas, 3 funções e `fichas.html` removidos, com teste real (não só sintaxe) confirmando 404 nas rotas removidas e funcionamento normal das retidas (`lista-simples`, `notif-emails`, `drive/folders`, `/auth/me`) |
 | I.6 | Trocar logo/favicon do `velinn-fichas` (páginas, favicon, e-mails) | ✅ Concluída e validada em produção em 2026-07-24 (commit `4d12770`) |
 
 **Teste end-to-end completo, ponta a ponta real, em 2026-07-24 (pelo usuário, fluxo real de parceiro):**
@@ -456,7 +459,10 @@ Sub-fases:
 
 **Validado em produção, ponta a ponta, em 2026-07-24:** handshake SSO real (token gerado no hub, consumido no fichas), listagem consultando Supabase de verdade (não mock, primeira vez que `velinn-fichas` acessa a tabela `usuarios`), `id` e permissões corretos em `/api/admin/me`, botões de ação corretos por permissão granular (sem bypass), logo/favicon novos visíveis na página. Ver `MIGRATION_LOG.md` no repositório para o detalhamento completo de todos os cenários testados por fase.
 
-**Migração I.1 a I.6 considerada 100% completa do lado do `velinn-fichas`.** Falta apenas a I.5 do lado do `velinn-hub` (limpeza de código órfão + troca de URL na tabela `quadros`), que é uma sessão separada e requer autorização explícita para a mudança de dado em produção.
+**Migração I.1 a I.6 completa — hub e fichas.** A Fase I inteira está
+fechada: lógica de negócio e interface de gestão vivem 100% em
+`velinn-fichas`; o `velinn-hub` ficou só com SSO/permissões e o card
+de acesso, sem nenhum código órfão remanescente.
 
 **Ajuste cosmético final (commit `f700747`):** removido o aviso "Esta página está em migração..." de `admin.html`, que ficou desatualizado depois da migração funcional estar completa e validada — confirmado visualmente que a remoção não deixou vão nem quebra de layout.
 
