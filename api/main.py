@@ -25,6 +25,7 @@ GMAIL_SA_JSON = os.environ.get("GMAIL_SA_JSON", "")
 DRIVE_SA_JSON = os.environ.get("DRIVE_SA_JSON", GMAIL_SA_JSON)
 HUB_URL       = os.environ.get("HUB_URL",  "https://velinn-hub.onrender.com")
 SELF_URL      = os.environ.get("SELF_URL", "https://velinn-fichas.onrender.com")
+DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "1dA7QPcogCs5Us9LZ5Wibf73pqvXStqkS")
 NOTIF_EMAILS        = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
 FICHAS_NOTIF_SECRET = os.environ.get("FICHAS_NOTIF_SECRET", "")
 
@@ -85,11 +86,55 @@ def db_insert(table, data):
     return r.ok
 
 
+def db_delete(table, params):
+    r = req.delete(f"{SUPABASE_URL}/rest/v1/{table}", headers=_headers(), params=params)
+    if not r.ok:
+        print(f"[db_delete] erro {r.status_code} em {table}: {r.text[:200]}")
+    return r.ok
+
+
 def _log(usuario: str, acao: str, detalhe: str = "", ip: str = ""):
     try:
         db_insert("logs", {"usuario": usuario, "acao": acao, "detalhe": detalhe, "ip": ip})
     except:
         pass
+
+
+# ── Permissões (Fase I.3) — mesma lógica do hub, operando sobre o dict
+# vindo da sessão local (populado via SSO) em vez da sessão do hub ────────
+def _admin_tem_acesso_fichas(user: dict) -> bool:
+    if not user:
+        return False
+    return user.get("nivel") in ("admin", "gerente") or "fichas" in (user.get("agentes") or [])
+
+
+def _admin_pode_criar_link(user: dict) -> bool:
+    if not user:
+        return False
+    return user.get("nivel") in ("admin", "gerente") or "pode_criar_link" in (user.get("agentes") or [])
+
+
+def _admin_tem_perm(user: dict, perm: str) -> bool:
+    if not user:
+        return False
+    return perm in (user.get("agentes") or [])
+
+
+def _lookup_usuario(usuario: str) -> dict:
+    """Busca id/nome/email na tabela usuarios (compartilhada com o hub) pelo
+    username — resolve o Achado 1 da Fase I.2 (SSO não carrega "id") sem
+    precisar mudar nada no hub."""
+    if not usuario:
+        return {}
+    rows = db_select("usuarios", {"usuario": f"eq.{usuario}", "select": "id,nome,email"})
+    return rows[0] if rows else {}
+
+
+def _lookup_usuario_por_id(uid: str) -> dict:
+    if not uid:
+        return {}
+    rows = db_select("usuarios", {"id": f"eq.{uid}", "select": "id,nome,email"})
+    return rows[0] if rows else {}
 
 
 def _gmail_token():
@@ -548,24 +593,21 @@ async def interno_cnpj(request: Request):
         return JSONResponse({"ok": False, "msg": str(e)})
 
 
-@app.post("/api/interno/gerar-ficha")
-async def interno_gerar_ficha(request: Request):
-    secret = request.headers.get("X-Notif-Secret", "")
-    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
-        return JSONResponse({"ok": False}, status_code=403)
-    body = await request.json()
-    nome_pousada       = body.get("nome_pousada", "").strip()
-    nome_prop          = body.get("nome_proprietario", "").strip()
-    email_prop         = body.get("email_proprietario", "").strip()
-    drive_folder       = body.get("drive_folder_id", "").strip()
-    gerente_id         = body.get("gerente_id", "").strip()
-    gerente_nome       = body.get("gerente_nome", "").strip()
-    gerente_email      = body.get("gerente_email", "").strip()
-    usuario_gerador    = body.get("usuario", "").strip()
+def _gerar_ficha_core(body: dict, usuario_gerador: str):
+    """Lógica de criação de ficha compartilhada entre /api/interno/gerar-ficha
+    (chamado pelo hub via X-Notif-Secret) e /api/admin/fichas/gerar (chamado
+    pelo navegador via sessão local) — nunca expor o secret no frontend."""
+    nome_pousada  = body.get("nome_pousada", "").strip()
+    nome_prop     = body.get("nome_proprietario", "").strip()
+    email_prop    = body.get("email_proprietario", "").strip()
+    drive_folder  = body.get("drive_folder_id", "").strip()
+    gerente_id    = body.get("gerente_id", "").strip()
+    gerente_nome  = body.get("gerente_nome", "").strip()
+    gerente_email = body.get("gerente_email", "").strip()
     if not nome_pousada or not nome_prop or not email_prop:
-        return JSONResponse({"ok": False, "msg": "Preencha todos os campos obrigatórios"}, status_code=400)
+        return {"ok": False, "msg": "Preencha todos os campos obrigatórios"}, 400
     if not gerente_id:
-        return JSONResponse({"ok": False, "msg": "Selecione o gerente responsável"}, status_code=400)
+        return {"ok": False, "msg": "Selecione o gerente responsável"}, 400
 
     token = secrets.token_urlsafe(24)
     num_testemunhas = int(body.get("num_testemunhas", 1))
@@ -583,11 +625,22 @@ async def interno_gerar_ficha(request: Request):
         "status":             "pendente",
     })
     if not ok:
-        return JSONResponse({"ok": False, "msg": "Erro ao salvar no banco"}, status_code=500)
+        return {"ok": False, "msg": "Erro ao salvar no banco"}, 500
     link = f"{SELF_URL}/cadastro/{token}"
     _log(usuario_gerador, "gerar_ficha", f"token={token[:8]} {nome_pousada} / {email_prop}")
     _enviar_email_link_cliente(email_prop, nome_prop, nome_pousada, link, gerente_nome)
-    return JSONResponse({"ok": True, "link": link, "token": token})
+    return {"ok": True, "link": link, "token": token}, 200
+
+
+@app.post("/api/interno/gerar-ficha")
+async def interno_gerar_ficha(request: Request):
+    secret = request.headers.get("X-Notif-Secret", "")
+    if not FICHAS_NOTIF_SECRET or secret != FICHAS_NOTIF_SECRET:
+        return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    usuario_gerador = body.get("usuario", "").strip()
+    data, status = _gerar_ficha_core(body, usuario_gerador)
+    return JSONResponse(data, status_code=status)
 
 
 @app.get("/logo")
@@ -645,8 +698,12 @@ def admin_me(request: Request):
         return JSONResponse({"ok": False}, status_code=401)
     agentes = user.get("agentes") or []
     nivel = user.get("nivel", "")
+    # Achado 1 (I.2): SSO não carrega "id" — resolvido via lookup direto na
+    # tabela usuarios (mesmo projeto Supabase compartilhado com o hub).
+    info = _lookup_usuario(user.get("usuario", ""))
     return JSONResponse({
         "ok": True,
+        "id":      info.get("id", ""),
         "usuario": user.get("usuario", ""),
         "nome": user.get("nome", ""),
         "nivel": nivel,
@@ -659,6 +716,92 @@ def admin_me(request: Request):
         "fichas_log":      "fichas_log" in agentes,
         "fichas_deletar":  "fichas_deletar" in agentes,
     })
+
+
+@app.get("/api/admin/fichas")
+def admin_listar_fichas(request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_acesso_fichas(user):
+        return JSONResponse({"ok": False}, status_code=403)
+    params = {"order": "criado_em.desc", "limit": "200"}
+    agentes = user.get("agentes") or []
+    ver_todas = user.get("nivel") == "admin" or "fichas_todas" in agentes
+    if not ver_todas:
+        info = _lookup_usuario(user.get("usuario", ""))
+        params["gerente_id"] = f"eq.{info.get('id', '')}"
+    data = db_select("fichas_cadastrais", params)
+    return JSONResponse({"ok": True, "data": data or []})
+
+
+@app.get("/api/admin/gerentes")
+def admin_listar_gerentes(request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_acesso_fichas(user):
+        return JSONResponse({"ok": False}, status_code=403)
+    rows = db_select("usuarios", {"nivel": "in.(gerente,admin)", "ativo": "eq.true",
+                                   "select": "id,usuario,nome,email", "order": "nome.asc"})
+    return JSONResponse({"ok": True, "data": rows or []})
+
+
+@app.get("/api/admin/drive/pastas")
+def admin_listar_pastas(request: Request, folder_id: str = ""):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_acesso_fichas(user):
+        return JSONResponse({"ok": False}, status_code=403)
+    fid = folder_id or DRIVE_ROOT_FOLDER
+    try:
+        svc = _drive_service_rw()
+        if not svc:
+            return JSONResponse({"ok": False, "msg": "Drive não configurado"})
+        q = f"'{fid}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        res = svc.files().list(
+            q=q, fields="files(id,name)",
+            orderBy="name", pageSize=100,
+            supportsAllDrives=True, includeItemsFromAllDrives=True
+        ).execute()
+        meta = svc.files().get(
+            fileId=fid, fields="id,name,parents",
+            supportsAllDrives=True
+        ).execute()
+        return JSONResponse({"ok": True, "pasta_id": fid, "pasta_nome": meta.get("name", ""),
+                             "parent_id": (meta.get("parents") or [None])[0],
+                             "pastas": res.get("files", [])})
+    except Exception as e:
+        print(f"[admin/drive/pastas] ERRO: {e}")
+        return JSONResponse({"ok": False, "msg": str(e)})
+
+
+@app.post("/api/admin/fichas/gerar")
+async def admin_gerar_ficha(request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_pode_criar_link(user):
+        return JSONResponse({"ok": False}, status_code=403)
+    body = await request.json()
+    nivel = user.get("nivel", "")
+
+    if nivel == "gerente":
+        info = _lookup_usuario(user.get("usuario", ""))
+        gerente_id    = info.get("id", "")
+        gerente_nome  = user.get("nome") or user.get("usuario", "")
+        gerente_email = info.get("email", "")
+        if not gerente_id:
+            return JSONResponse({"ok": False, "msg": "Não foi possível identificar o gerente responsável"}, status_code=400)
+    else:
+        gerente_id   = body.get("gerente_id", "").strip()
+        gerente_nome = body.get("gerente_nome", "").strip()
+        if not gerente_id:
+            return JSONResponse({"ok": False, "msg": "Selecione o gerente responsável"}, status_code=400)
+        info = _lookup_usuario_por_id(gerente_id)
+        gerente_email = info.get("email", "")
+        if not gerente_nome and info:
+            gerente_nome = info.get("nome", "")
+
+    payload = dict(body)
+    payload["gerente_id"] = gerente_id
+    payload["gerente_nome"] = gerente_nome
+    payload["gerente_email"] = gerente_email
+    data, status = _gerar_ficha_core(payload, user.get("usuario", ""))
+    return JSONResponse(data, status_code=status)
 
 
 @app.get("/admin/logout")
