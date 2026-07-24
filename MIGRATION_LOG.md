@@ -111,3 +111,28 @@ Investiguei linha por linha antes de listar qualquer coisa como "órfã", e enco
 
 ---
 
+## Fase I.6 — Logo/favicon nos lugares restantes
+
+### O que foi implementado
+
+- `cadastro.html`: `<link rel="icon">` trocado de `/favicon.svg` para `/static/favicon.png`; `<img>` do topo trocado de `/logo` para `/static/logo.png`.
+- Os 3 templates de e-mail (`_enviar_email_link_cliente`, `_enviar_email_agradecimento`, `_enviar_email_notificacao`) trocados de `https://velinn-fichas.onrender.com/logo` para `https://velinn-fichas.onrender.com/static/logo.png` (mantive URL absoluta — obrigatório para imagens funcionarem dentro de e-mail, relativo não funciona em cliente de e-mail).
+- Confirmei via `grep` recursivo que **nenhuma referência** a `/logo` ou `/favicon.svg` (rotas antigas) restava em nenhum arquivo do projeto antes de remover.
+- Removidos: `logo.png` e `favicon.svg` da raiz do projeto (arquivos físicos antigos).
+- **Decisão corolário, não pedida explicitamente mas consequência direta**: removi também as rotas `GET /logo` e `GET /favicon.svg` de `api/main.py` — elas ficariam servindo `FileResponse` para arquivos que não existem mais (erro 500 em runtime), então deixá-las órfãs seria pior do que removê-las. Nenhuma outra rota ou arquivo as referenciava.
+
+### 3 cenários testados
+
+Nesta fase não há modelo de permissão (são arquivos estáticos e templates de e-mail, sem autenticação) — o cenário "erro/permissão negada" da regra 3 não se aplica de forma natural aqui. Substituí por dois cenários de borda distintos, registrando essa adaptação explicitamente:
+
+1. **Sucesso** — inspecionei o código-fonte das 3 funções de e-mail: todas usam `static/logo.png`, nenhuma ainda referencia o `/logo` antigo. ✅
+2. **Borda 1** — inspecionei as rotas registradas no app (`app.routes`): `/logo` e `/favicon.svg` não existem mais; `/static/logo.png` e `/static/favicon.png` existem. ✅
+3. **Borda 2** — confirmei que os arquivos físicos novos existem em `static/` (não são referências quebradas) e que os arquivos antigos (`logo.png`, `favicon.svg` na raiz) foram de fato removidos do disco, não só desreferenciados. ✅
+
+### Pendências / achados para validação humana
+
+- Nenhuma. Esta fase não tem dependência de Supabase/Drive real — a verificação mais importante (arquivos existem fisicamente, rotas certas registradas) já foi feita de forma determinística, não por mock.
+- Vale conferir visualmente em produção que o logo carrega corretamente nos 3 e-mails (Gmail às vezes cacheia imagens por remetente/domínio de forma imprevisível) e no favicon da aba do navegador em `cadastro.html`.
+
+---
+

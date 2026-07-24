@@ -649,15 +649,6 @@ async def interno_gerar_ficha(request: Request):
     return JSONResponse(data, status_code=status)
 
 
-@app.get("/logo")
-def logo():
-    return FileResponse(os.path.join(BASE, "logo.png"), media_type="image/png")
-
-@app.get("/favicon.svg")
-def favicon():
-    return FileResponse(os.path.join(BASE, "favicon.svg"), media_type="image/svg+xml")
-
-
 @app.get("/static/logo.png")
 def static_logo():
     return FileResponse(os.path.join(BASE, "static", "logo.png"), media_type="image/png")
@@ -1089,7 +1080,7 @@ VELINN Hotels
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
-    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:40px;" />
+    <img src="https://velinn-fichas.onrender.com/static/logo.png" alt="VELINN Hotel" style="height:40px;" />
     <p style="color:#b48c50;font-size:15px;font-weight:600;margin:10px 0 0;letter-spacing:0.5px;">Ficha Cadastral</p>
   </div>
   <div style="padding:32px;">
@@ -1135,7 +1126,7 @@ def _enviar_email_agradecimento(ficha: dict):
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:24px 32px;text-align:center;border-bottom:3px solid #b48c50;">
-    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:36px;" />
+    <img src="https://velinn-fichas.onrender.com/static/logo.png" alt="VELINN Hotel" style="height:36px;" />
   </div>
   <div style="padding:32px;">
     <h2 style="color:#222;font-size:20px;">Ficha recebida com sucesso! ✓</h2>
@@ -1177,7 +1168,7 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
     html = f"""
 <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <div style="background:#0d1117;padding:20px 32px;text-align:center;border-bottom:3px solid #b48c50;">
-    <img src="https://velinn-fichas.onrender.com/logo" alt="VELINN Hotel" style="height:32px;display:block;margin:0 auto 8px;" />
+    <img src="https://velinn-fichas.onrender.com/static/logo.png" alt="VELINN Hotel" style="height:32px;display:block;margin:0 auto 8px;" />
     <span style="color:#b48c50;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Nova Ficha Cadastral</span>
   </div>
   <div style="padding:28px;">
