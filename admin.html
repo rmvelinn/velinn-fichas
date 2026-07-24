@@ -10,7 +10,7 @@
 
     body {
       min-height: 100vh;
-      background: #F5F1E8;
+      background: #f4f1eb;
       font-family: 'Segoe UI', sans-serif;
       display: flex;
       flex-direction: column;
@@ -61,8 +61,8 @@
     }
 
     .topo { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-    .titulo { color: #1a1a2e; font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
-    .subtitulo { color: #6b7280; font-size: 0.9rem; }
+    .titulo { color: #1a1a2e; font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .subtitulo { color: #666; font-size: 13px; }
 
     .btn-novo {
       background: #b48c50;
@@ -81,18 +81,19 @@
     .stats { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat-box {
       background: #ffffff;
-      border: 1px solid #E5E0D5;
-      border-radius: 10px;
-      padding: 14px 20px;
+      border: 1px solid #e0d0b0;
+      border-radius: 8px;
+      padding: 16px;
       min-width: 110px;
+      text-align: center;
     }
-    .stat-box .n { color: #1a1a2e; font-size: 1.4rem; font-weight: 700; }
-    .stat-box .l { color: #6b7280; font-size: 0.75rem; margin-top: 2px; }
+    .stat-box .n { color: #b48c50; font-size: 28px; font-weight: 700; }
+    .stat-box .l { color: #666; font-size: 12px; margin-top: 4px; }
 
     .filtros { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
     .filter-btn {
       background: #ffffff;
-      border: 1px solid #E5E0D5;
+      border: 1px solid #d4c8b0;
       border-radius: 20px;
       padding: 7px 16px;
       color: #6b7280;
@@ -102,29 +103,32 @@
     }
     .filter-btn.active { background: #FBF3E4; border-color: #b48c50; color: #b48c50; }
 
+    .table-wrap { background: #fff; border: 1px solid #e0d0b0; border-radius: 8px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; }
     thead th {
       text-align: left;
       color: #b48c50;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 10px 12px;
-      background: #0d1117;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .3px;
+      padding: 10px 14px;
+      background: #1a1a2e;
+      white-space: nowrap;
     }
+    tbody tr { background: #ffffff; transition: background .15s; }
+    tbody tr:hover { background: #fffaf5; }
     tbody td {
-      padding: 12px;
-      color: #1a1a2e;
-      font-size: 0.85rem;
-      background: #ffffff;
-      border-bottom: 1px solid #EFECE3;
+      padding: 10px 14px;
+      color: #333;
+      font-size: 13px;
+      border-bottom: 1px solid #f0e8d8;
       vertical-align: middle;
     }
-    .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
-    .badge-preenchido { background: #DCFCE7; color: #16A34A; }
-    .badge-visualizado { background: #DBEAFE; color: #2563EB; }
-    .badge-pendente { background: #FEF3C7; color: #D97706; }
+    tbody tr:last-child td { border-bottom: none; }
+    .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge-preenchido { background: #d1e7dd; color: #0a3622; }
+    .badge-visualizado { background: #cff4fc; color: #055160; }
+    .badge-pendente { background: #fff3cd; color: #856404; }
 
     .btn-action {
       background: rgba(255,255,255,0.04);
@@ -266,21 +270,23 @@
     <button class="filter-btn" onclick="filtrar('pendente', this)">Pendentes</button>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Pousada</th>
-        <th>Proprietário</th>
-        <th>Gerente</th>
-        <th>Status</th>
-        <th>Data</th>
-        <th>Ações</th>
-      </tr>
-    </thead>
-    <tbody id="tbody">
-      <tr><td colspan="6"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Carregando...</div></div></td></tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Pousada</th>
+          <th>Proprietário</th>
+          <th>Gerente</th>
+          <th>Status</th>
+          <th>Data</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="6"><div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Carregando...</div></div></td></tr>
+      </tbody>
+    </table>
+  </div>
 </main>
 
 <div class="modal-overlay" id="modal">
