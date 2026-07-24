@@ -1030,14 +1030,19 @@ def _pos_submissao(ficha: dict):
         pdf_bytes = None
 
     pdf_url = ""
+    pdf_falha_motivo = ""
     if pdf_bytes and pasta_docs_velinn:
         nome = f"Ficha_{ficha['nome_pousada'].replace(' ','_')}.pdf"
         pdf_url = _drive_upload(svc, pasta_docs_velinn, nome, pdf_bytes)
         if pdf_url:
             db_update("fichas_cadastrais", {"pdf_drive_url": pdf_url}, {"token": f"eq.{ficha['token']}"})
+        else:
+            pdf_falha_motivo = "upload ao Drive falhou"
     elif pdf_bytes and not pasta_docs_velinn:
+        pdf_falha_motivo = "pasta do Drive não configurada/resolvida"
         print(f"[drive] pulado — pasta não resolvida (folder='{folder_id}')")
     else:
+        pdf_falha_motivo = "geração do PDF falhou"
         print(f"[drive] pulado — pdf_bytes={'sim' if pdf_bytes else 'nao'} folder='{folder_id}'")
 
     # Busca CNPJ e salva Cartão + QSA no Drive
@@ -1061,8 +1066,10 @@ def _pos_submissao(ficha: dict):
     elif cnpj and not pasta_docs_hotel:
         cnpj_status = "❌ Erro: Drive não configurado"
 
+    db_update("fichas_cadastrais", {"cnpj_status": cnpj_status}, {"token": f"eq.{ficha['token']}"})
+
     _enviar_email_agradecimento(ficha)
-    _enviar_email_notificacao(ficha, pdf_url, cnpj_status)
+    _enviar_email_notificacao(ficha, pdf_url, cnpj_status, pdf_falha_motivo)
     print(f"[pos_submissao] concluído")
 
 
@@ -1151,7 +1158,7 @@ def _enviar_email_agradecimento(ficha: dict):
         _enviar_email(dest, assunto, plain, html)
 
 
-def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
+def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = "", pdf_falha_motivo: str = ""):
     pousada      = ficha.get("nome_pousada", "")
     gerente_email = ficha.get("gerente_email", "")
     gerente_nome  = ficha.get("gerente_nome", "")
@@ -1160,9 +1167,12 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
         ts = datetime.fromisoformat(ts).astimezone(BRT).strftime("%d/%m/%Y às %H:%M")
     except:
         pass
-    pdf_link = f'<a href="{pdf_url}" style="color:#b48c50;">Baixar PDF</a>' if pdf_url else "(Drive não configurado)"
+    pdf_link = (f'<a href="{pdf_url}" style="color:#b48c50;">Baixar PDF</a>' if pdf_url
+                else f"❌ Falhou: {pdf_falha_motivo}" if pdf_falha_motivo
+                else "(não gerado)")
     assunto = f"[Ficha Preenchida] {pousada}"
-    plain = f"A ficha de {pousada} foi preenchida por {ficha.get('nome_proprietario','')} em {ts}. Gerente: {gerente_nome}. PDF: {pdf_url or 'não gerado'}"
+    pdf_plain = pdf_url or (f"FALHOU ({pdf_falha_motivo})" if pdf_falha_motivo else "não gerado")
+    plain = f"A ficha de {pousada} foi preenchida por {ficha.get('nome_proprietario','')} em {ts}. Gerente: {gerente_nome}. PDF: {pdf_plain}"
     pousada_safe            = _html.escape(pousada)
     nome_proprietario_safe  = _html.escape(ficha.get('nome_proprietario',''))
     email_proprietario_safe = _html.escape(ficha.get('email_proprietario',''))
@@ -1187,7 +1197,7 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = ""):
       <tr><td style="padding:8px;background:#f9f5ee;font-weight:600;">Captura CNPJ</td><td style="padding:8px;">{cnpj_status}</td></tr>
     </table>
     <p style="margin-top:20px;font-size:13px;color:#666;">
-      Acesse o <a href="{HUB_URL}/fichas" style="color:#b48c50;">painel de fichas</a> para ver todos os detalhes.
+      Acesse o <a href="{SELF_URL}/admin" style="color:#b48c50;">painel de fichas</a> para ver todos os detalhes.
     </p>
   </div>
 </div>"""

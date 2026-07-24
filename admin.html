@@ -490,6 +490,10 @@ function renderTabela(status) {
         ? `<span class="badge badge-visualizado" title="Aberto em ${_fmtData(f.visualizado_em)}">👁 Visualizado</span>`
         : '<span class="badge badge-pendente">⏳ Pendente</span>';
     const data = f.preenchido_em ? _fmtData(f.preenchido_em) : _fmtData(f.criado_em);
+    const alertaFicha = f.status === 'preenchido' && !f.pdf_drive_url
+      ? `<span title="PDF da Ficha não foi salvo no Drive" style="color:#f87171;cursor:default;">⚠️</span> ` : '';
+    const alertaCnpj = f.status === 'preenchido' && f.cnpj_status && f.cnpj_status.startsWith('❌')
+      ? `<span title="Falha no CNPJ/QSA: ${esc(f.cnpj_status)}" style="color:#f87171;cursor:default;">⚠️</span> ` : '';
     const linkBtn = meData && meData.fichas_link
       ? `<button class="btn-action" onclick="copiarLinkTabela('${SELF_ORIGIN}/cadastro/${f.token}', this)" title="Copiar link">🔗 Link</button>`
       : '';
@@ -509,7 +513,7 @@ function renderTabela(status) {
       ? `<button class="btn-action" style="color:#f87171;border-color:rgba(248,113,113,0.2)" onclick="deletarFicha('${f.token}', '${esc(f.nome_pousada)}')" title="Excluir ficha">🗑️ Excluir</button>`
       : '';
     return `<tr>
-      <td>${esc(f.nome_pousada)}</td>
+      <td>${alertaFicha}${alertaCnpj}${esc(f.nome_pousada)}</td>
       <td>${esc(f.nome_proprietario)}</td>
       <td>${esc(f.gerente_nome)}</td>
       <td>${badge}</td>
