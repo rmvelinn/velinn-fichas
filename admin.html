@@ -268,7 +268,7 @@
     <img class="logo" src="/static/logo.png" alt="VELINN" />
     <div class="header-links">
       <span class="user-badge">Olá, <span id="nome-usuario">…</span></span>
-      <a href="https://velinn-hub.onrender.com/agentes" class="btn-back">← Hub</a>
+      <a id="btn-hub-link" href="https://velinn-hub.onrender.com/agentes" class="btn-back">← Hub</a>
       <a href="/admin/logout" class="sair">Sair</a>
     </div>
   </div>
@@ -458,6 +458,7 @@ let buscaAtual = '';
 function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 const HUB_AGENTES_URL = 'https://velinn-hub.onrender.com/agentes';
+document.getElementById('btn-hub-link').href = HUB_AGENTES_URL;
 
 // Sessão do /admin vive em memória no hub — um restart do processo (deploy,
 // reciclagem por inatividade) apaga sessões ativas sem invalidar o cookie no
