@@ -457,8 +457,23 @@ let buscaAtual = '';
 
 function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-const HUB_AGENTES_URL = 'https://velinn-hub.onrender.com/agentes';
+let HUB_AGENTES_URL = 'https://velinn-hub.onrender.com/agentes'; // fallback — sobrescrito por /api/config abaixo, se disponível
 document.getElementById('btn-hub-link').href = HUB_AGENTES_URL;
+
+// Busca a URL real do hub via backend (fonte única: env var HUB_URL). Se a
+// chamada falhar por qualquer motivo (rede, deploy, endpoint fora do ar),
+// mantém o fallback hardcoded acima — nunca trava a página por causa disso.
+(async function _carregarHubUrl() {
+  try {
+    const r = await fetch('/api/config');
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.hub_url) {
+      HUB_AGENTES_URL = data.hub_url + '/agentes';
+      document.getElementById('btn-hub-link').href = HUB_AGENTES_URL;
+    }
+  } catch (e) { /* mantém o fallback hardcoded */ }
+})();
 
 // Sessão do /admin vive em memória no hub — um restart do processo (deploy,
 // reciclagem por inatividade) apaga sessões ativas sem invalidar o cookie no
