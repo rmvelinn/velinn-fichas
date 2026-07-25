@@ -573,6 +573,11 @@ def health():
     return JSONResponse({"status": "ok", "ts": datetime.now(timezone.utc).isoformat()})
 
 
+@app.get("/api/config")
+def api_config():
+    return JSONResponse({"hub_url": HUB_URL})
+
+
 def _cnpj_core(cnpj: str, folder_id: str):
     """Lógica de consulta/upload de CNPJ+QSA compartilhada entre
     /api/interno/cnpj (X-Notif-Secret, chamado pelo hub) e
