@@ -208,7 +208,10 @@ def _buscar_cnpj(cnpj: str) -> dict:
         return {}
     try:
         r = req.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}", timeout=10)
-        return r.json() if r.ok else {}
+        if not r.ok:
+            print(f"[cnpj] resposta não-OK da BrasilAPI: status={r.status_code} corpo={r.text[:300]!r}")
+            return {}
+        return r.json()
     except Exception as e:
         print(f"[cnpj] FALHA: {e}")
         return {}
