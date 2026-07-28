@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from contextlib import asynccontextmanager
-import os, secrets, requests as req, json, base64, io, html as _html
+import os, secrets, requests as req, json, base64, io, html as _html, time
 from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -28,6 +28,8 @@ SELF_URL      = os.environ.get("SELF_URL", "https://velinn-fichas.onrender.com")
 DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "1dA7QPcogCs5Us9LZ5Wibf73pqvXStqkS")
 NOTIF_EMAILS        = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
 FICHAS_NOTIF_SECRET = os.environ.get("FICHAS_NOTIF_SECRET", "")
+CNPJ_PROXY_URL    = os.environ.get("CNPJ_PROXY_URL", "")
+CNPJ_PROXY_SECRET = os.environ.get("CNPJ_PROXY_SECRET", "")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
@@ -206,15 +208,21 @@ def _buscar_cnpj(cnpj: str) -> dict:
     cnpj_digits = "".join(c for c in (cnpj or "") if c.isdigit())
     if len(cnpj_digits) != 14:
         return {}
-    try:
-        r = req.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}", timeout=10)
-        if not r.ok:
-            print(f"[cnpj] resposta não-OK da BrasilAPI: status={r.status_code} corpo={r.text[:300]!r}")
-            return {}
-        return r.json()
-    except Exception as e:
-        print(f"[cnpj] FALHA: {e}")
+    if not CNPJ_PROXY_URL:
+        print("[cnpj] CNPJ_PROXY_URL não configurada — abortando consulta")
         return {}
+    for tentativa, espera in enumerate((0, 2, 4), start=1):
+        if espera:
+            time.sleep(espera)
+        try:
+            r = req.post(CNPJ_PROXY_URL, json={"cnpj": cnpj_digits},
+                         headers={"X-Cnpj-Proxy-Secret": CNPJ_PROXY_SECRET}, timeout=10)
+            if r.ok:
+                return r.json()
+            print(f"[cnpj] tentativa {tentativa}/3 — resposta não-OK: status={r.status_code} corpo={r.text[:300]!r}")
+        except Exception as e:
+            print(f"[cnpj] tentativa {tentativa}/3 — FALHA: {e}")
+    return {}
 
 
 def _gerar_pdf_cartao_cnpj(dados: dict) -> bytes:

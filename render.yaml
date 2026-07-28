@@ -23,3 +23,7 @@ services:
         sync: false
       - key: FICHAS_NOTIF_SECRET
         sync: false
+      - key: CNPJ_PROXY_URL
+        sync: false
+      - key: CNPJ_PROXY_SECRET
+        sync: false
