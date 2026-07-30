@@ -23,7 +23,7 @@ EMAIL_FROM   = os.environ.get("EMAIL_FROM",   "no-reply@velinn.com")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "marcelo.brandao@velinn.com")
 GMAIL_SA_JSON = os.environ.get("GMAIL_SA_JSON", "")
 DRIVE_SA_JSON = os.environ.get("DRIVE_SA_JSON", GMAIL_SA_JSON)
-HUB_URL       = os.environ.get("HUB_URL",  "https://velinn-hub.onrender.com")
+HUB_URL       = os.environ.get("HUB_URL",  "https://hub.velinn.com")
 SELF_URL      = os.environ.get("SELF_URL", "https://velinn-fichas.onrender.com")
 DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "1dA7QPcogCs5Us9LZ5Wibf73pqvXStqkS")
 NOTIF_EMAILS        = [e.strip() for e in os.environ.get("NOTIF_EMAILS", "").split(",") if e.strip()]
@@ -684,6 +684,9 @@ def static_favicon():
 @app.get("/admin")
 def admin_page(request: Request, sso: str = None):
     if sso:
+        if not HUB_URL:
+            print("[admin] ERRO: HUB_URL ausente — não é possível validar handshake SSO")
+            return JSONResponse({"ok": False, "msg": "Configuração do servidor incompleta (HUB_URL ausente)"}, status_code=500)
         try:
             r = req.get(f"{HUB_URL}/api/sso/verificar", params={"token": sso}, timeout=8)
             if r.ok:
@@ -702,6 +705,9 @@ def admin_page(request: Request, sso: str = None):
             print(f"[sso] erro: {e}")
     user = _admin_session_user(request)
     if not user:
+        if not HUB_URL:
+            print("[admin] ERRO: HUB_URL ausente — não é possível redirecionar para login")
+            return JSONResponse({"ok": False, "msg": "Configuração do servidor incompleta (HUB_URL ausente)"}, status_code=500)
         return RedirectResponse(f"{HUB_URL}/agentes", status_code=302)
     return FileResponse(os.path.join(BASE, "admin.html"))
 
@@ -935,7 +941,11 @@ def admin_logout(request: Request):
     token = request.cookies.get("fichas_admin_session")
     if token:
         _ADMIN_SESSIONS.pop(token, None)
-    resp = RedirectResponse(f"{HUB_URL}/agentes", status_code=302)
+    if not HUB_URL:
+        print("[admin] ERRO: HUB_URL ausente — não é possível redirecionar após logout")
+        resp = JSONResponse({"ok": False, "msg": "Configuração do servidor incompleta (HUB_URL ausente)"}, status_code=500)
+    else:
+        resp = RedirectResponse(f"{HUB_URL}/agentes", status_code=302)
     resp.delete_cookie("fichas_admin_session")
     return resp
 
@@ -1219,14 +1229,16 @@ def _enviar_email_notificacao(ficha: dict, pdf_url: str, cnpj_status: str = "", 
 </div>"""
     # Busca emails com notif_fichas=true do Hub
     hub_emails = []
-    try:
-        if HUB_URL and FICHAS_NOTIF_SECRET:
+    if not HUB_URL:
+        print("[notif] HUB_URL ausente — pulando busca de e-mails adicionais do Hub (segue só com NOTIF_EMAILS/gerente)")
+    elif FICHAS_NOTIF_SECRET:
+        try:
             r = req.get(f"{HUB_URL}/api/fichas/notif-emails",
                              headers={"X-Notif-Secret": FICHAS_NOTIF_SECRET}, timeout=5)
             if r.ok:
                 hub_emails = r.json().get("emails", [])
-    except Exception as e:
-        print(f"[notif] erro ao buscar emails do Hub: {e}")
+        except Exception as e:
+            print(f"[notif] erro ao buscar emails do Hub: {e}")
 
     destinatarios = [e for e in ({gerente_email} | set(NOTIF_EMAILS) | set(hub_emails)) if e]
     for dest in destinatarios:
