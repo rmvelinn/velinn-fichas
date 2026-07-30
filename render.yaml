@@ -27,3 +27,5 @@ services:
         sync: false
       - key: CNPJ_PROXY_SECRET
         sync: false
+      - key: CLICKUP_API_TOKEN
+        sync: false
