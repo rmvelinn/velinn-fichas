@@ -48,7 +48,7 @@ segredo de comunicação interno:
 | Consulta CNPJ | BrasilAPI pública (`brasilapi.com.br/api/cnpj/v1/{cnpj}`) — sem chave |
 | Consulta CEP | ViaCEP pública (`viacep.com.br`) — sem chave |
 | Frontend | HTML/CSS/JS puro — sem framework, zero dependências externas |
-| Hospedagem | Render (free tier) |
+| Hospedagem | Google Cloud Run (`southamerica-east1`) — migrado de Render em 2026-07-26/28, ver seção 12 |
 | Repositórios | `rmvelinn/velinn-fichas` + `rmvelinn/velinn-hub` (GitHub, privados) |
 
 **Decisão registrada — por que dois apps separados:** ver seção 6.1.
@@ -325,6 +325,9 @@ de fases vale a partir de agora para frente.
 | Foto de perfil pessoal do CRO aparece no Gmail do parceiro (`no-reply@velinn.com` usa alias pessoal) | Baixa | Logo já gerado (`velinn_profile.png`), falta aplicar na conta |
 | Testemunhas no modal de edição não validadas em produção com fichas reais com testemunhas | Baixa | Pendente validação |
 | `supabase_hub.sql` não existe | Baixa | Ver Fase F |
+| `notif-emails` (`api/main.py:1207-1208`) falha silenciosamente (só `print` dentro de `try/except`) se o hub estiver inacessível ou `HUB_URL` mudar sem sincronizar — lista de e-mails internos notificados fica vazia sem ninguém perceber | Média | Identificado em 2026-07-24 durante investigação cross-project (Fase 1 do hub, `HUB_URL`); deveria virar alerta visível, mesma lógica já usada na Fase D para falha de upload de PDF/CNPJ. Não corrigido ainda |
+| `SELF_URL` e `DRIVE_ROOT_FOLDER` ausentes do `render.yaml` | Baixa | Ambas têm fallback hardcoded funcional no código, não bloqueia nada — identificado durante investigação de preparação para Cloud Run (2026-07-26). No Cloud Run essas vars são configuradas direto na interface dele, não via `render.yaml` |
+| Logo nos e-mails HTML hardcoded (`api/main.py:1097,1143,1188`), sem usar `SELF_URL` | Baixa | Mesma classe de hardcode já resolvida para `HUB_URL` (seção 13) — identificado durante investigação de preparação para Cloud Run (2026-07-26), não corrigido |
 
 ---
 
@@ -466,6 +469,62 @@ de acesso, sem nenhum código órfão remanescente.
 
 **Ajuste cosmético final (commit `f700747`):** removido o aviso "Esta página está em migração..." de `admin.html`, que ficou desatualizado depois da migração funcional estar completa e validada — confirmado visualmente que a remoção não deixou vão nem quebra de layout.
 
+**Bug real corrigido (commit `c985d9b`, 2026-07-24):** sessão do painel `/admin` vive em memória (`_ADMIN_SESSIONS`) — qualquer restart do processo (deploy, reciclagem do Render por inatividade) invalida sessões ativas, mas o cookie no navegador continua "válido" (dentro das 24h). Antes da correção, isso causava um erro genérico ("Falha ao carregar") em qualquer ação do painel, sem explicação — usuário só descobria que precisava relogar por tentativa (F5). Descoberto quando o Scrum Master do `velinn-checklist` reproduziu o mesmo padrão de erro ao investigar a arquitetura de SSO compartilhada. Corrigido com um helper único (`fetchAdmin`/`fetchAdminBlob`) que centraliza a checagem de `403` nas 9 chamadas a `/api/admin/*` e redireciona automaticamente para `{HUB_URL}/agentes` — mesmo destino já usado quando não há sessão nenhuma. Testado end-to-end com servidor mock real simulando os 9 caminhos normais e o cenário de 403 completo (confirmado: redirect sem nenhuma mensagem de erro piscando antes). A arquitetura de sessão em memória em si não foi alterada — é aceita como está, só a experiência de erro foi corrigida.
+
+**Investigação cross-project (2026-07-24) — `HUB_URL` hardcoded, coordenada pelo Scrum Master do `velinn-hub` (Fase 1 do roadmap do hub: eliminar `HUB_URL` hardcoded no ecossistema):**
+- Backend (`api/main.py`) já centraliza em `HUB_URL` (env var com fallback) — usado em 4 pontos: validação SSO, 2 redirects de auth (login sem sessão / logout), e chamada a `notif-emails`.
+- **Achado estrutural relevante:** `admin.html` (frontend estático) tem 2 valores hardcoded independentes — um link informativo ("← Hub") e a constante `HUB_AGENTES_URL` usada no redirect de sessão expirada (ver bug acima) — sem nenhuma env var por trás, já que HTML/JS estático não lê variáveis de ambiente do servidor. Uma futura migração de domínio do hub exigiria editar `admin.html` manualmente, não só trocar a env var. O mecanismo definitivo (provavelmente um endpoint tipo `/api/config`) está sendo desenhado pelo Scrum do hub, olhando o padrão em outros projetos frontend antes de fechar.
+- **Confirmado:** `velinn-fichas` não consome `/api/sso/gerar` nem `/api/unidades` do hub — só `/api/sso/verificar` e `/api/fichas/notif-emails`. Se o roadmap do hub assumia uso universal desses dois endpoints, o fichas é uma exceção documentada.
+- **Correção isolada solicitada pelo hub:** `HUB_AGENTES_URL` em `admin.html` era regressão recente (nasceu no commit `c985d9b`, não dívida antiga). **Concluída em 2026-07-24, 3 commits isolados:** `20c9dfc` (Item 1 — consolidação em ponto único), `b36909e` (Item 2 — endpoint `GET /api/config` no backend, reaproveitando `HUB_URL`), `d398744` (Item 3 — `admin.html` consome `/api/config` de forma assíncrona, com fallback hardcoded se a chamada falhar). Testado com valor propositalmente diferente do hardcoded (`http://localhost:9999`) para confirmar substituição real, não coincidência — inclusive confirmado que o redirect de sessão expirada (403) também passa a usar o valor dinâmico, não só o link visual. Zero regressão no fluxo de SSO/auth em nenhum dos 3 commits.
+- **Pendência formalizada (não corrigida ainda):** `api/main.py:1207-1208` (`notif-emails`) falha silenciosamente se o hub estiver inacessível ou `HUB_URL` mudar sem sincronizar — a lista de e-mails internos notificados fica vazia sem nenhum aviso. Adicionado à seção 9 (dívida técnica) desta atualização.
+
+**Migração completa para Google Cloud Run (2026-07-26/28) — Render desligado.**
+
+`velinn-fichas` e `velinn-hub` migraram de Render para Google Cloud Run
+(região `southamerica-east1`, projeto `lucid-tiger-503616-a9`), com
+`min-instances=1`/`max-instances=1` como mitigação da sessão em memória
+(`_ADMIN_SESSIONS`) — a solução definitiva (sessão sair da memória, indo
+para Supabase/Redis) segue como decisão de arquitetura em aberto, fora do
+escopo desta migração.
+
+**Bug real descoberto e corrigido durante a migração — CNPJ/QSA falhando
+silenciosamente no Cloud Run:** a consulta à BrasilAPI (`_buscar_cnpj`)
+retornava `429 Too Many Requests` especificamente quando a chamada saía do
+Cloud Run, nunca do Render — causa raiz: o Cloud Run (sem VPC connector)
+usa um pool de IPs de saída compartilhado entre clientes do Google Cloud
+na região, com reputação diferente do IP do Render junto à BrasilAPI.
+Diagnosticado por eliminação: confirmado via `curl` externo que o CNPJ de
+teste era válido; investigação de código descartou timeout/certificado
+(Gmail usa a mesma biblioteca `requests` e funciona); confirmado ausência
+de VPC connector (descartando bloqueio de egress); log temporário
+adicionado a `_buscar_cnpj` capturou a evidência definitiva:
+`status=429 corpo='Too Many Requests... gru1::...'`.
+
+**Correção implementada:** proxy dedicado no `velinn-agent-server` (Oracle
+Cloud, IP já com reputação limpa por rodar outros agentes do ecossistema há
+tempo) — serviço `systemd` novo (`velinn-cnpj-proxy`, porta 8090,
+`http.server` + `requests`, sem framework), repassando a consulta à
+BrasilAPI e devolvendo status+corpo exatamente como recebido. `_buscar_cnpj`
+passou a chamar esse proxy (`CNPJ_PROXY_URL`/`CNPJ_PROXY_SECRET`, secret
+dedicado, não reaproveita `X-Notif-Secret`) com retry de 3 tentativas
+(backoff 2s/4s) como rede de segurança para falhas transitórias, independente
+da causa. Validado em produção: submissão real de teste retornou
+"✅ Cartão CNPJ e QSA gerados e salvos no Drive".
+
+**Opções descartadas e por quê (registrado para referência futura, ex.
+migração do `velinn-checklist`):** Cloud NAT com IP estático dedicado
+(robusto e definitivo, mas custo permanente desproporcional ao volume atual
+de uso) e proxy via Render (descartado por recriar dependência exatamente
+no serviço que a migração pretendia eliminar). Proxy via Oracle escolhido
+por reaproveitar infraestrutura já paga/mantida, sem criar dependência nova
+nem custo adicional.
+
+**Nota para a migração do `velinn-checklist`:** confirmado que ele consulta
+CNPJ/CEP/bancos inteiramente client-side (JavaScript no navegador do
+usuário, não no backend) — por isso nunca teve esse problema; não é
+comparável, e não há necessidade de replicar o proxy lá a menos que uma
+consulta de CNPJ no backend seja adicionada no futuro.
+
 **Nota técnica registrada durante I.1a:** `velinn-fichas` não tinha até então
 nenhum helper de escrita em log (`db_insert`/`_log`) nem env var para a
 própria URL. Ambos foram criados nesta sub-fase: `SELF_URL` (env var nova,
@@ -473,6 +532,90 @@ com fallback para o valor hardcoded `https://velinn-fichas.onrender.com`,
 sem necessidade de configurar no Render agora) e `db_insert`/`_log`
 replicando exatamente o padrão já usado no hub (mesmo formato de log, mesmo
 tratamento de erro).
+
+---
+
+## 13. Correção — fallback de HUB_URL desatualizado (coordenada cross-project)
+
+**Contexto:** o domínio do `velinn-hub` mudou para `https://hub.velinn.com`
+em 29/07/2026; o Render foi suspenso em 27/07/2026. Uma verificação
+transversal solicitada pelo Scrum Master do hub (rastreamento: ClickUp
+`86e2jvbvp`) encontrou o fallback antigo (`https://velinn-hub.onrender.com`,
+domínio morto) hardcoded em **3 lugares** neste projeto:
+- `api/main.py:26` — declaração de `HUB_URL`
+- `admin.html:271` — `href` estático do link "← Hub"
+- `admin.html:460` — `HUB_AGENTES_URL`
+
+**Risco:** bug latente, não ativo — a env var real em produção estava
+correta. Mas se `HUB_URL` sumisse num redeploy futuro, o serviço cairia
+silenciosamente tentando falar com um domínio morto, sem erro em log.
+
+**Correção (commit `3ed352a`):**
+1. Valor do fallback corrigido nos 3 lugares para `https://hub.velinn.com`.
+2. **Fail-fast localizado, não global** — decisão deliberada de não seguir
+   a Regra 3 do `CLAUDE.md` (fail no boot) ao pé da letra: `velinn-fichas`
+   serve tanto o painel `/admin` quanto o formulário público `cadastro.html`
+   no mesmo processo. Se `HUB_URL` estiver genuinamente ausente, os 4
+   pontos que de fato usam essa variável (validação de SSO, redirect sem
+   sessão, logout, `notif-emails`) falham visivelmente e isoladamente —
+   nunca o processo inteiro, nunca afetando a submissão do parceiro.
+   `notif-emails` em particular não vira erro HTTP (está no fluxo síncrono
+   do parceiro) — só ganhou um log explícito que não existia antes.
+
+**Testado:** com `HUB_URL=""` explícito e Supabase real conectado —
+`/admin` e `/admin/logout` retornam `500` com mensagem clara;
+`/cadastro/{token}` continua respondendo normalmente (`404` esperado
+para token de teste), sem nenhum log de erro relacionado.
+
+**Achado incidental, não corrigido (fora do escopo desta correção):**
+`render.yaml:21` ainda declara `HUB_URL` com `value:` apontando pro
+domínio antigo — é o que o Render efetivamente injetaria se o serviço
+fosse redeployado a partir desse arquivo. Como o Render está desligado
+(migração completa para Cloud Run, seção 12), o risco prático é baixo,
+mas fica registrado.
+
+**Aprovado em produção por Marcelo em 2026-07-30**, tarefa `86e2jvbvp`
+movida para Histórico (Concluído) no ClickUp.
+
+---
+
+## 14. Integração com ClickUp (acompanhamento de projeto)
+
+**Estrutura criada em 2026-07-24/30** no Espaço "Projetos VELINN"
+(id `90176697701`, mesmo padrão já usado pelo `velinn-hub`):
+- Pasta "VELINN Fichas" (id `901710227244`)
+- Lista "Roadmap & Pendências" (id `901715683600`)
+- Lista "Histórico (Concluído)" (id `901715683602`)
+- Status disponíveis: `não iniciada`, `planejado`, `codando`,
+  `aguardando teste`, `stand-by`, `aprovada`, `cancelada`
+
+**Dois mecanismos de acesso ao workspace, distintos e documentados
+separadamente** (relevante para a rotação de credencial em andamento,
+ClickUp `86e2kkm78`):
+1. **`clickup_helper.py`** (commit `810048f`) — usado pelo Claude Code,
+   autenticado via `CLICKUP_API_TOKEN` (env var, `.env` local não
+   commitado + `render.yaml` `sync: false`; presença no Cloud Run não
+   confirmada por falta de sessão `gcloud` autenticada). Duas funções:
+   `mover_status_tarefa()` e `comentar_tarefa()`. Uso 100% interativo,
+   nenhum cron/webhook/automação agendada.
+2. **Conector MCP OAuth** — usado pela sessão de chat/acompanhamento
+   (Scrum Master), credencial separada gerenciada pela plataforma, não
+   armazenada neste repositório.
+
+**Trava de segurança em `clickup_helper.py` — testada com API real, não
+só mock:** `mover_status_tarefa()` recusa incondicionalmente o valor
+`"aprovada"` (`if novo_status.strip().lower() == "aprovada": raise
+PermissionError(...)`, antes de qualquer requisição HTTP ser montada).
+Validado com uma tarefa sandbox real: tentativa de mover para "aprovada"
+bloqueada, confirmado por `GET` independente que o status no ClickUp não
+mudou. **Marcar uma tarefa como "aprovada" é sempre decisão manual do
+usuário** — nunca do Code.
+
+**Fluxo de ciclo de vida de tarefa** (documentado em `CLAUDE.md`):
+identificação sempre por ID explícito (nunca por nome), Code pode mover
+até "aguardando teste" e comentar, "aprovada" é decisão do usuário, e
+mover de "Roadmap & Pendências" para "Histórico (Concluído)" após
+aprovação é feito pelo chat de acompanhamento — nunca pelo Code.
 
 ---
 
