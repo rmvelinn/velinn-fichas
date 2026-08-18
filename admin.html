@@ -605,10 +605,15 @@ function renderTabela(status) {
     const editBtn = f.status === 'preenchido' && meData && meData.fichas_editar
       ? `<button class="btn-action" style="color:#fbbf24" onclick="abrirEditar('${f.token}')" title="Editar ficha">✏️ Editar</button>`
       : '';
-    const perdidoBtn = f.status === 'pendente' && !f.motivo_perda && meData && meData.fichas_editar
+    const podeMarcarPerda = meData && (
+      meData.nivel === 'admin' ||
+      meData.fichas_editar ||
+      (meData.nivel === 'gerente' && meData.id && meData.id === f.gerente_id)
+    );
+    const perdidoBtn = f.status === 'pendente' && !f.motivo_perda && podeMarcarPerda
       ? `<button class="btn-action" style="color:#7a3b3b" onclick="abrirModalPerda('${f.token}','${esc(f.nome_pousada)}')" title="Marcar como perdida">❌ Perdido</button>`
       : '';
-    const reativarBtn = f.status === 'pendente' && f.motivo_perda && meData && meData.fichas_editar
+    const reativarBtn = f.status === 'pendente' && f.motivo_perda && podeMarcarPerda
       ? `<button class="btn-action" style="color:#34d399" onclick="reativarFicha('${f.token}')" title="Reverter marcação de perda">↩️ Reativar</button>`
       : '';
     const logBtn = f.status === 'preenchido' && meData && meData.fichas_log

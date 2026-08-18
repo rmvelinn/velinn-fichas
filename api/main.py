@@ -889,12 +889,20 @@ def admin_log_ficha(token: str, request: Request):
 @app.patch("/api/admin/fichas/{token}/perda")
 async def admin_marcar_perda(token: str, request: Request):
     user = _admin_session_user(request)
-    if not user or not _admin_tem_perm(user, "fichas_editar"):
+    if not user:
         return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
     rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
     if not rows or not isinstance(rows, list):
         return JSONResponse({"ok": False, "msg": "Ficha não encontrada"}, status_code=404)
     ficha = rows[0]
+    nivel = user.get("nivel", "")
+    agentes = user.get("agentes") or []
+    pode = nivel == "admin" or "fichas_editar" in agentes
+    if not pode and nivel == "gerente":
+        info = _lookup_usuario(user.get("usuario", ""))
+        pode = bool(info.get("id")) and info.get("id") == ficha.get("gerente_id")
+    if not pode:
+        return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
     if ficha["status"] != "pendente":
         return JSONResponse({"ok": False, "msg": "Só é possível marcar fichas pendentes"}, status_code=400)
     body = await request.json()
