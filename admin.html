@@ -150,6 +150,7 @@
     .badge-preenchido { background: #d1e7dd; color: #0a3622; }
     .badge-visualizado { background: #cff4fc; color: #055160; }
     .badge-pendente { background: #fff3cd; color: #856404; }
+    .badge-perdido { background: #e5d9d9; color: #7a3b3b; }
 
     .acoes-wrap { display: flex; flex-direction: column; gap: 4px; }
     .acoes-linha { display: flex; gap: 4px; }
@@ -198,7 +199,7 @@
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; color: #9ca3af; font-size: 0.8rem; margin-bottom: 6px; }
     .form-group .req { color: #b48c50; }
-    .form-group input, .form-group select {
+    .form-group input, .form-group select, .form-group textarea {
       width: 100%;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.1);
@@ -446,6 +447,22 @@
   </div>
 </div>
 
+<!-- Modal: Marcar como Perdida -->
+<div class="modal-overlay" id="modal-perda">
+  <div class="modal-box" style="max-width:420px;">
+    <h2>Marcar como Perdida</h2>
+    <div id="modal-perda-pousada" style="font-size:0.85rem;color:#9ca3af;margin-top:-12px;margin-bottom:16px;"></div>
+    <div class="form-group">
+      <label>Motivo <span class="req">*</span></label>
+      <textarea id="perda-motivo" rows="3" oninput="_atualizarBtnPerda()" placeholder="Ex: contrato não avançou, sem retorno do parceiro..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancelar" onclick="fecharModalPerda()">Cancelar</button>
+      <button class="btn-gerar" id="btn-confirmar-perda" onclick="confirmarPerda()" disabled>Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -566,15 +583,17 @@ function renderTabela(status) {
   tbody.innerHTML = dados.map(f => {
     const badge = f.status === 'preenchido'
       ? '<span class="badge badge-preenchido">✓ Preenchido</span>'
-      : f.visualizado_em
-        ? `<span class="badge badge-visualizado" title="Aberto em ${_fmtData(f.visualizado_em)}">👁 Visualizado</span>`
-        : '<span class="badge badge-pendente">⏳ Pendente</span>';
+      : f.motivo_perda
+        ? `<span class="badge badge-perdido" title="${esc(f.motivo_perda)}">❌ Perdido</span>`
+        : f.visualizado_em
+          ? `<span class="badge badge-visualizado" title="Aberto em ${_fmtData(f.visualizado_em)}">👁 Visualizado</span>`
+          : '<span class="badge badge-pendente">⏳ Pendente</span>';
     const data = f.status === 'preenchido' ? _fmtData(f.preenchido_em) : '-';
     const alertaFicha = f.status === 'preenchido' && !f.pdf_drive_url
       ? `<span title="PDF da Ficha não foi salvo no Drive" style="color:#f87171;cursor:default;">⚠️</span> ` : '';
     const alertaCnpj = f.status === 'preenchido' && f.cnpj_status && f.cnpj_status.startsWith('❌')
       ? `<span title="Falha no CNPJ/QSA: ${esc(f.cnpj_status)}" style="color:#f87171;cursor:default;">⚠️</span> ` : '';
-    const linkBtn = meData && meData.fichas_link
+    const linkBtn = meData && meData.fichas_link && !(f.status === 'pendente' && f.motivo_perda)
       ? `<button class="btn-action" onclick="copiarLinkTabela('${SELF_ORIGIN}/cadastro/${f.token}', this)" title="Copiar link">🔗 Link</button>`
       : '';
     const pdfBtn = f.status === 'preenchido' && meData && meData.fichas_pdf
@@ -585,6 +604,12 @@ function renderTabela(status) {
       : '';
     const editBtn = f.status === 'preenchido' && meData && meData.fichas_editar
       ? `<button class="btn-action" style="color:#fbbf24" onclick="abrirEditar('${f.token}')" title="Editar ficha">✏️ Editar</button>`
+      : '';
+    const perdidoBtn = f.status === 'pendente' && !f.motivo_perda && meData && meData.fichas_editar
+      ? `<button class="btn-action" style="color:#7a3b3b" onclick="abrirModalPerda('${f.token}','${esc(f.nome_pousada)}')" title="Marcar como perdida">❌ Perdido</button>`
+      : '';
+    const reativarBtn = f.status === 'pendente' && f.motivo_perda && meData && meData.fichas_editar
+      ? `<button class="btn-action" style="color:#34d399" onclick="reativarFicha('${f.token}')" title="Reverter marcação de perda">↩️ Reativar</button>`
       : '';
     const logBtn = f.status === 'preenchido' && meData && meData.fichas_log
       ? `<button class="btn-action" style="color:#34d399" onclick="verLog('${f.token}', '${esc(f.nome_pousada)}')" title="Ver histórico de edições">📋 Log</button>`
@@ -600,7 +625,7 @@ function renderTabela(status) {
       <td style="color:#9ca3af">${data}</td>
       <td><div class="acoes-wrap">
         <div class="acoes-linha">${linkBtn}${pdfBtn}${cnpjBtn}</div>
-        <div class="acoes-linha">${editBtn}${logBtn}${delBtn}</div>
+        <div class="acoes-linha">${editBtn}${logBtn}${delBtn}${perdidoBtn}${reativarBtn}</div>
       </div></td>
     </tr>`;
   }).join('');
@@ -913,6 +938,55 @@ async function deletarFicha(token, pousada) {
       await carregarFichas();
     } else {
       toast(res.msg || 'Erro ao excluir', true);
+    }
+  } catch { toast('Erro de conexão', true); }
+}
+
+let _perdaToken = null;
+
+function abrirModalPerda(token, pousada) {
+  _perdaToken = token;
+  document.getElementById('modal-perda-pousada').textContent = pousada;
+  document.getElementById('perda-motivo').value = '';
+  document.getElementById('btn-confirmar-perda').disabled = true;
+  document.getElementById('modal-perda').classList.add('open');
+}
+
+function fecharModalPerda() {
+  document.getElementById('modal-perda').classList.remove('open');
+}
+
+function _atualizarBtnPerda() {
+  document.getElementById('btn-confirmar-perda').disabled = !document.getElementById('perda-motivo').value.trim();
+}
+
+async function confirmarPerda() {
+  const motivo = document.getElementById('perda-motivo').value.trim();
+  if (!motivo) return;
+  try {
+    const res = await fetchAdmin(`/api/admin/fichas/${_perdaToken}/perda`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({motivo})
+    });
+    if (res.ok) {
+      toast('Ficha marcada como perdida');
+      fecharModalPerda();
+      await carregarFichas();
+    } else {
+      toast(res.msg || 'Erro ao marcar', true);
+    }
+  } catch { toast('Erro de conexão', true); }
+}
+
+async function reativarFicha(token) {
+  try {
+    const res = await fetchAdmin(`/api/admin/fichas/${token}/perda`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({motivo: null})
+    });
+    if (res.ok) {
+      toast('Ficha reativada');
+      await carregarFichas();
+    } else {
+      toast(res.msg || 'Erro ao reativar', true);
     }
   } catch { toast('Erro de conexão', true); }
 }

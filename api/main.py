@@ -886,6 +886,28 @@ def admin_log_ficha(token: str, request: Request):
     return JSONResponse({"ok": True, "logs": rows or []})
 
 
+@app.patch("/api/admin/fichas/{token}/perda")
+async def admin_marcar_perda(token: str, request: Request):
+    user = _admin_session_user(request)
+    if not user or not _admin_tem_perm(user, "fichas_editar"):
+        return JSONResponse({"ok": False, "msg": "Acesso negado"}, status_code=403)
+    rows = db_select("fichas_cadastrais", {"token": f"eq.{token}"})
+    if not rows or not isinstance(rows, list):
+        return JSONResponse({"ok": False, "msg": "Ficha não encontrada"}, status_code=404)
+    ficha = rows[0]
+    if ficha["status"] != "pendente":
+        return JSONResponse({"ok": False, "msg": "Só é possível marcar fichas pendentes"}, status_code=400)
+    body = await request.json()
+    motivo = body.get("motivo")
+    if motivo is not None and not str(motivo).strip():
+        return JSONResponse({"ok": False, "msg": "Motivo não pode ser vazio"}, status_code=400)
+    ok = db_update("fichas_cadastrais", {"motivo_perda": motivo}, {"token": f"eq.{token}"})
+    if ok:
+        acao = "marcar_perda" if motivo else "reativar_ficha"
+        _log(user.get("usuario", ""), acao, f"token={token[:8]}")
+    return JSONResponse({"ok": ok})
+
+
 @app.delete("/api/admin/fichas/{token}")
 def admin_deletar_ficha(token: str, request: Request):
     user = _admin_session_user(request)
