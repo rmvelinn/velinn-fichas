@@ -632,6 +632,8 @@ def _gerar_ficha_core(body: dict, usuario_gerador: str):
         return {"ok": False, "msg": "Preencha todos os campos obrigatórios"}, 400
     if not gerente_id:
         return {"ok": False, "msg": "Selecione o gerente responsável"}, 400
+    if not drive_folder:
+        return {"ok": False, "msg": "Selecione uma pasta do Drive antes de gerar o link"}, 400
 
     token = secrets.token_urlsafe(24)
     num_testemunhas = int(body.get("num_testemunhas", 0))

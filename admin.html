@@ -695,6 +695,10 @@ async function gerarLink() {
     toast('Preencha os campos obrigatórios', true);
     return;
   }
+  if (!drive) {
+    toast('Selecione uma pasta do Drive antes de gerar o link', true);
+    return;
+  }
 
   let gerente_id = '', gerente_nome = '';
   if (nivelAtual === 'gerente') {
